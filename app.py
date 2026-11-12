@@ -1,0 +1,467 @@
+import csv
+import io
+import os
+import secrets
+import sqlite3
+from datetime import date, datetime
+from functools import wraps
+from pathlib import Path
+
+from flask import (Flask, abort, flash, g, redirect, render_template, request,
+                   Response, session, url_for)
+from werkzeug.security import check_password_hash, generate_password_hash
+
+BASE = Path(__file__).resolve().parent
+DB = BASE / 'bibliocontrol.db'
+KEYFILE = BASE / '.secret_key'
+if not KEYFILE.exists():
+    KEYFILE.write_text(secrets.token_hex(32), encoding='utf-8')
+
+app = Flask(__name__)
+app.config.update(SECRET_KEY=os.environ.get('BIBLIO_SECRET_KEY', KEYFILE.read_text(encoding='utf-8').strip()),
+                  SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
+                  MAX_CONTENT_LENGTH=2 * 1024 * 1024)
+
+
+def connection():
+    if 'db' not in g:
+        g.db = sqlite3.connect(DB)
+        g.db.row_factory = sqlite3.Row
+        g.db.execute('PRAGMA foreign_keys=ON')
+        g.db.execute('PRAGMA busy_timeout=5000')
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(exc):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
+
+
+def init_db():
+    db = connection()
+    db.executescript('''
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS rooms (
+      id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, location TEXT NOT NULL DEFAULT '',
+      responsible TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS books (
+      id INTEGER PRIMARY KEY, code TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL, author TEXT NOT NULL DEFAULT '', category TEXT NOT NULL DEFAULT '',
+      isbn TEXT NOT NULL DEFAULT '', publisher TEXT NOT NULL DEFAULT '',
+      room_id INTEGER NOT NULL REFERENCES rooms(id),
+      condition TEXT NOT NULL DEFAULT 'Bueno' CHECK(condition IN ('Bueno','Regular','Deteriorado')),
+      status TEXT NOT NULL DEFAULT 'Disponible' CHECK(status IN ('Disponible','Prestado','Baja')),
+      notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS loans (
+      id INTEGER PRIMARY KEY, book_id INTEGER NOT NULL REFERENCES books(id),
+      borrower TEXT NOT NULL, department TEXT NOT NULL DEFAULT '',
+      loan_date TEXT NOT NULL, due_date TEXT NOT NULL,
+      return_date TEXT, notes TEXT NOT NULL DEFAULT '',
+      CHECK(return_date IS NULL OR return_date >= loan_date));
+    CREATE UNIQUE INDEX IF NOT EXISTS one_active_loan ON loans(book_id) WHERE return_date IS NULL;
+    CREATE TABLE IF NOT EXISTS transfers (
+      id INTEGER PRIMARY KEY, book_id INTEGER NOT NULL REFERENCES books(id),
+      from_room_id INTEGER NOT NULL REFERENCES rooms(id),
+      to_room_id INTEGER NOT NULL REFERENCES rooms(id),
+      person TEXT NOT NULL, transferred_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      notes TEXT NOT NULL DEFAULT '', CHECK(from_room_id != to_room_id));
+    CREATE TABLE IF NOT EXISTS audits (
+      id INTEGER PRIMARY KEY, room_id INTEGER NOT NULL REFERENCES rooms(id),
+      audited_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      auditor TEXT NOT NULL, observations TEXT NOT NULL DEFAULT '');
+    CREATE TABLE IF NOT EXISTS audit_items (
+      id INTEGER PRIMARY KEY, audit_id INTEGER NOT NULL REFERENCES audits(id) ON DELETE CASCADE,
+      book_id INTEGER NOT NULL REFERENCES books(id),
+      result TEXT NOT NULL CHECK(result IN ('Encontrado','No encontrado','Novedad')),
+      note TEXT NOT NULL DEFAULT '', UNIQUE(audit_id,book_id));
+    CREATE TABLE IF NOT EXISTS events (
+      id INTEGER PRIMARY KEY, actor TEXT NOT NULL, action TEXT NOT NULL,
+      detail TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    ''')
+    db.commit()
+
+
+@app.before_request
+def before():
+    init_db()
+    if 'csrf' not in session:
+        session['csrf'] = secrets.token_urlsafe(32)
+    if request.method == 'POST' and not secrets.compare_digest(
+            session.get('csrf', ''), request.form.get('csrf', '')):
+        abort(400, 'Formulario inválido. Actualiza la página y vuelve a intentarlo.')
+    allowed = {'setup', 'login', 'static'}
+    endpoint = request.endpoint
+    if not connection().execute('SELECT 1 FROM users LIMIT 1').fetchone():
+        if endpoint not in {'setup', 'static'}:
+            return redirect(url_for('setup'))
+    elif endpoint not in allowed and not session.get('user_id'):
+        return redirect(url_for('login'))
+
+
+@app.context_processor
+def context():
+    return {'csrf_token': session.get('csrf', ''), 'current_user': session.get('username'), 'today': date.today().isoformat()}
+
+
+def log(action, detail):
+    connection().execute('INSERT INTO events(actor, action, detail) VALUES (?,?,?)',
+                         (session.get('username', 'sistema'), action, detail))
+
+
+def val(name, maxlen=255, required=False):
+    text = (request.form.get(name) or '').strip()
+    if required and not text:
+        raise ValueError(f'El campo «{name}» es obligatorio.')
+    if len(text) > maxlen:
+        raise ValueError(f'El campo «{name}» supera {maxlen} caracteres.')
+    return text
+
+
+def dateval(name):
+    text = val(name, 10, True)
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        raise ValueError(f'Fecha inválida: {name}')
+    return text
+
+
+def as_int(name):
+    try:
+        return int(request.form.get(name, ''))
+    except (ValueError, TypeError):
+        raise ValueError(f'Identificador inválido: {name}')
+
+
+@app.route('/configuracion', methods=['GET', 'POST'])
+def setup():
+    if connection().execute('SELECT 1 FROM users LIMIT 1').fetchone():
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        username = val('username', 40, True)
+        password = request.form.get('password', '')
+        if len(password) < 10:
+            flash('La contraseña debe tener al menos 10 caracteres.', 'danger')
+        else:
+            connection().execute('INSERT INTO users(username,password_hash) VALUES (?,?)',
+                                 (username, generate_password_hash(password)))
+            connection().commit()
+            flash('Administrador creado. Inicia sesión.', 'success')
+            return redirect(url_for('login'))
+    return render_template('setup.html')
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = val('username', 40)
+        user = connection().execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
+        if user and check_password_hash(user['password_hash'], request.form.get('password', '')):
+            session.clear()
+            session.update(user_id=user['id'], username=user['username'], csrf=secrets.token_urlsafe(32))
+            return redirect(url_for('dashboard'))
+        flash('Usuario o contraseña incorrectos.', 'danger')
+    return render_template('login.html')
+
+
+@app.post('/salir')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route('/')
+def dashboard():
+    db = connection()
+    metrics = dict(rooms=db.execute('SELECT count(*) FROM rooms WHERE active=1').fetchone()[0],
+                   total=db.execute('SELECT count(*) FROM books').fetchone()[0],
+                   available=db.execute("SELECT count(*) FROM books WHERE status='Disponible'").fetchone()[0],
+                   loaned=db.execute("SELECT count(*) FROM books WHERE status='Prestado'").fetchone()[0],
+                   overdue=db.execute('SELECT count(*) FROM loans WHERE return_date IS NULL AND due_date < ?',
+                                      (date.today().isoformat(),)).fetchone()[0])
+    per_room = db.execute('''SELECT r.name, count(b.id) total,
+       sum(CASE WHEN b.status='Disponible' THEN 1 ELSE 0 END) available
+       FROM rooms r LEFT JOIN books b ON b.room_id=r.id WHERE r.active=1
+       GROUP BY r.id ORDER BY r.name''').fetchall()
+    recent = db.execute('''SELECT e.* FROM events e ORDER BY id DESC LIMIT 8''').fetchall()
+    return render_template('dashboard.html', metrics=metrics, per_room=per_room, recent=recent)
+
+
+@app.route('/salas', methods=['GET', 'POST'])
+def rooms():
+    db = connection()
+    if request.method == 'POST':
+        try:
+            name, location, responsible = val('name', 100, True), val('location', 150), val('responsible', 120)
+            with db:
+                db.execute('INSERT INTO rooms(name,location,responsible) VALUES (?,?,?)', (name, location, responsible))
+                log('Sala creada', name)
+            flash('Sala registrada correctamente.', 'success')
+        except (ValueError, sqlite3.IntegrityError) as ex:
+            flash(str(ex), 'danger')
+        return redirect(url_for('rooms'))
+    items = db.execute('''SELECT r.*, COUNT(b.id) total FROM rooms r
+                          LEFT JOIN books b ON b.room_id=r.id GROUP BY r.id ORDER BY r.name''').fetchall()
+    return render_template('rooms.html', items=items)
+
+
+@app.post('/salas/<int:room_id>/editar')
+def edit_room(room_id):
+    db = connection()
+    try:
+        name, location, responsible = val('name', 100, True), val('location', 150), val('responsible', 120)
+        with db:
+            cur = db.execute('UPDATE rooms SET name=?,location=?,responsible=? WHERE id=?',
+                             (name, location, responsible, room_id))
+            if not cur.rowcount: abort(404)
+            log('Sala editada', name)
+        flash('Sala actualizada.', 'success')
+    except (ValueError, sqlite3.IntegrityError) as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('rooms'))
+
+
+@app.route('/libros', methods=['GET', 'POST'])
+def books():
+    db = connection()
+    if request.method == 'POST':
+        try:
+            room_id = as_int('room_id')
+            if not db.execute('SELECT 1 FROM rooms WHERE id=? AND active=1', (room_id,)).fetchone():
+                raise ValueError('La sala seleccionada no existe.')
+            fields = [val('code', 40, True), val('title', 200, True), val('author', 150),
+                      val('category', 80), val('isbn', 30), val('publisher', 100)]
+            condition, notes = val('condition', 20), val('notes', 500)
+            if condition not in ('Bueno','Regular','Deteriorado'): raise ValueError('Estado físico inválido.')
+            with db:
+                db.execute('''INSERT INTO books(code,title,author,category,isbn,publisher,room_id,condition,notes)
+                              VALUES (?,?,?,?,?,?,?,?,?)''', (*fields, room_id, condition, notes))
+                log('Libro registrado', f'{fields[0]} · {fields[1]}')
+            flash('Ejemplar agregado al inventario.', 'success')
+        except (ValueError, sqlite3.IntegrityError) as ex:
+            flash(str(ex), 'danger')
+        return redirect(url_for('books'))
+    q = request.args.get('q', '').strip()[:100]
+    room = request.args.get('room', '').strip()
+    sql = '''SELECT b.*,r.name room FROM books b JOIN rooms r ON r.id=b.room_id WHERE 1=1'''
+    args = []
+    if q:
+        sql += ' AND (b.code LIKE ? OR b.title LIKE ? OR b.author LIKE ?)'
+        args += [f'%{q}%'] * 3
+    if room.isdigit():
+        sql += ' AND b.room_id=?'; args.append(int(room))
+    sql += ' ORDER BY b.id DESC'
+    return render_template('books.html', items=db.execute(sql, args).fetchall(),
+                           rooms=db.execute('SELECT * FROM rooms WHERE active=1 ORDER BY name').fetchall(), q=q, chosen_room=room)
+
+
+@app.post('/libros/<int:book_id>/editar')
+def edit_book(book_id):
+    db = connection()
+    try:
+        fields = (val('title', 200, True), val('author', 150), val('category', 80),
+                  val('isbn', 30), val('publisher', 100), val('condition', 20), val('notes', 500))
+        if fields[5] not in ('Bueno','Regular','Deteriorado'): raise ValueError('Estado físico inválido.')
+        with db:
+            cur = db.execute('''UPDATE books SET title=?,author=?,category=?,isbn=?,publisher=?,condition=?,notes=?
+                                WHERE id=?''', (*fields, book_id))
+            if not cur.rowcount: abort(404)
+            log('Libro editado', f'ID {book_id}: {fields[0]}')
+        flash('Datos bibliográficos actualizados.', 'success')
+    except ValueError as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('books'))
+
+
+@app.post('/libros/<int:book_id>/baja')
+def disable_book(book_id):
+    db = connection()
+    try:
+        with db:
+            book = db.execute('SELECT * FROM books WHERE id=?', (book_id,)).fetchone()
+            if not book: abort(404)
+            if book['status'] == 'Prestado': raise ValueError('No se puede dar de baja un ejemplar prestado.')
+            next_status = 'Disponible' if book['status'] == 'Baja' else 'Baja'
+            db.execute('UPDATE books SET status=? WHERE id=?', (next_status, book_id))
+            log('Cambio de estado', f"{book['code']}: {next_status}")
+        flash('Estado actualizado.', 'success')
+    except ValueError as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('books'))
+
+
+@app.route('/prestamos', methods=['GET', 'POST'])
+def loans():
+    db = connection()
+    if request.method == 'POST':
+        try:
+            book_id = as_int('book_id')
+            borrower = val('borrower', 150, True)
+            department, loan_date, due_date, notes = val('department', 100), dateval('loan_date'), dateval('due_date'), val('notes', 500)
+            if due_date < loan_date: raise ValueError('La fecha límite debe ser igual o posterior a la fecha del préstamo.')
+            with db:
+                changed = db.execute("UPDATE books SET status='Prestado' WHERE id=? AND status='Disponible'", (book_id,))
+                if not changed.rowcount: raise ValueError('El ejemplar no está disponible para préstamo.')
+                db.execute('''INSERT INTO loans(book_id,borrower,department,loan_date,due_date,notes)
+                              VALUES (?,?,?,?,?,?)''', (book_id, borrower, department, loan_date, due_date, notes))
+                log('Préstamo', f'Ejemplar ID {book_id} entregado a {borrower}')
+            flash('Préstamo registrado.', 'success')
+        except (ValueError, sqlite3.IntegrityError) as ex:
+            flash(str(ex), 'danger')
+        return redirect(url_for('loans'))
+    items = db.execute('''SELECT l.*, b.code, b.title, r.name room FROM loans l
+                           JOIN books b ON b.id=l.book_id JOIN rooms r ON r.id=b.room_id
+                           ORDER BY (l.return_date IS NULL) DESC, l.id DESC''').fetchall()
+    available = db.execute("SELECT id,code,title FROM books WHERE status='Disponible' ORDER BY title").fetchall()
+    return render_template('loans.html', items=items, available=available)
+
+
+@app.post('/prestamos/<int:loan_id>/devolver')
+def return_book(loan_id):
+    db = connection()
+    try:
+        returned = dateval('return_date')
+        with db:
+            loan = db.execute('SELECT * FROM loans WHERE id=? AND return_date IS NULL', (loan_id,)).fetchone()
+            if not loan: raise ValueError('El préstamo ya fue devuelto o no existe.')
+            if returned < loan['loan_date']: raise ValueError('La devolución no puede ser anterior al préstamo.')
+            db.execute('UPDATE loans SET return_date=? WHERE id=?', (returned, loan_id))
+            db.execute("UPDATE books SET status='Disponible' WHERE id=?", (loan['book_id'],))
+            log('Devolución', f'Préstamo ID {loan_id} · ejemplar ID {loan["book_id"]}')
+        flash('Devolución registrada.', 'success')
+    except ValueError as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('loans'))
+
+
+@app.route('/traslados', methods=['GET','POST'])
+def transfers():
+    db = connection()
+    if request.method == 'POST':
+        try:
+            book_id, to_room = as_int('book_id'), as_int('to_room_id')
+            person, notes = val('person', 150, True), val('notes', 500)
+            with db:
+                book = db.execute('SELECT * FROM books WHERE id=?', (book_id,)).fetchone()
+                if not book or book['status'] != 'Disponible':
+                    raise ValueError('Solo se pueden trasladar ejemplares disponibles.')
+                if to_room == book['room_id']: raise ValueError('Selecciona una sala de destino diferente.')
+                if not db.execute('SELECT 1 FROM rooms WHERE id=? AND active=1', (to_room,)).fetchone():
+                    raise ValueError('La sala de destino no existe.')
+                db.execute('''INSERT INTO transfers(book_id,from_room_id,to_room_id,person,notes)
+                              VALUES (?,?,?,?,?)''', (book_id, book['room_id'], to_room, person, notes))
+                db.execute('UPDATE books SET room_id=? WHERE id=?', (to_room, book_id))
+                log('Traslado', f"{book['code']}: sala {book['room_id']} → {to_room}")
+            flash('Traslado registrado.', 'success')
+        except ValueError as ex:
+            flash(str(ex), 'danger')
+        return redirect(url_for('transfers'))
+    items = db.execute('''SELECT t.*,b.code,b.title, a.name source, z.name destination
+                           FROM transfers t JOIN books b ON b.id=t.book_id
+                           JOIN rooms a ON a.id=t.from_room_id JOIN rooms z ON z.id=t.to_room_id
+                           ORDER BY t.id DESC''').fetchall()
+    available = db.execute("SELECT id,code,title,room_id FROM books WHERE status='Disponible' ORDER BY title").fetchall()
+    rooms_list = db.execute('SELECT id,name FROM rooms WHERE active=1 ORDER BY name').fetchall()
+    return render_template('transfers.html', items=items, available=available, rooms=rooms_list)
+
+
+@app.route('/auditorias', methods=['GET','POST'])
+def audits():
+    db = connection()
+    if request.method == 'POST':
+        try:
+            room_id, auditor, observations = as_int('room_id'), val('auditor', 150, True), val('observations', 1000)
+            books_in_room = db.execute('SELECT id FROM books WHERE room_id=? AND status != ?', (room_id, 'Baja')).fetchall()
+            if not db.execute('SELECT 1 FROM rooms WHERE id=?', (room_id,)).fetchone():
+                raise ValueError('La sala no existe.')
+            states = []
+            for book in books_in_room:
+                result = request.form.get(f'result_{book["id"]}')
+                if result not in ('Encontrado','No encontrado','Novedad'):
+                    raise ValueError('Verifica todos los resultados de la auditoría.')
+                note = (request.form.get(f'note_{book["id"]}') or '').strip()[:500]
+                states.append((book['id'],result,note))
+            with db:
+                cur = db.execute('INSERT INTO audits(room_id,auditor,observations) VALUES (?,?,?)',
+                                 (room_id, auditor, observations))
+                db.executemany('''INSERT INTO audit_items(audit_id,book_id,result,note) VALUES (?,?,?,?)''',
+                               [(cur.lastrowid, *state) for state in states])
+                log('Auditoría', f'Sala ID {room_id}: {len(states)} ejemplares verificados')
+            flash('Auditoría guardada. Es un registro histórico: no modifica automáticamente el inventario.', 'success')
+        except ValueError as ex:
+            flash(str(ex), 'danger')
+        return redirect(url_for('audits'))
+    room_id = request.args.get('room', '')
+    rooms_list = db.execute('SELECT * FROM rooms WHERE active=1 ORDER BY name').fetchall()
+    selected = int(room_id) if room_id.isdigit() else None
+    books_in_room = db.execute("SELECT * FROM books WHERE room_id=? AND status!='Baja' ORDER BY code", (selected,)).fetchall() if selected else []
+    history = db.execute('''SELECT a.*,r.name room,
+                           (SELECT COUNT(*) FROM audit_items i WHERE i.audit_id=a.id AND result='No encontrado') missing,
+                           (SELECT COUNT(*) FROM audit_items i WHERE i.audit_id=a.id AND result='Novedad') issues,
+                           (SELECT COUNT(*) FROM audit_items i WHERE i.audit_id=a.id) total
+                           FROM audits a JOIN rooms r ON r.id=a.room_id ORDER BY a.id DESC''').fetchall()
+    return render_template('audits.html', rooms=rooms_list, selected=selected, books=books_in_room, history=history)
+
+
+@app.route('/auditorias/<int:audit_id>')
+def audit_detail(audit_id):
+    db = connection()
+    audit = db.execute('SELECT a.*,r.name room FROM audits a JOIN rooms r ON r.id=a.room_id WHERE a.id=?', (audit_id,)).fetchone()
+    if not audit: abort(404)
+    items = db.execute('''SELECT i.*,b.code,b.title FROM audit_items i
+                          JOIN books b ON b.id=i.book_id WHERE i.audit_id=? ORDER BY b.code''',(audit_id,)).fetchall()
+    return render_template('audit_detail.html', audit=audit, items=items)
+
+
+EXPORTS = {
+    'inventario': ('''SELECT b.code codigo, b.title titulo, b.author autor, b.category categoria,
+                       b.isbn isbn, r.name sala, b.condition estado_fisico, b.status disponibilidad,
+                       b.notes observaciones FROM books b JOIN rooms r ON r.id=b.room_id ORDER BY r.name,b.code''', 'inventario'),
+    'prestamos': ('''SELECT b.code codigo, b.title titulo, l.borrower prestatario, l.department dependencia,
+                      l.loan_date fecha_prestamo, l.due_date fecha_limite, l.return_date fecha_devolucion,
+                      l.notes observaciones FROM loans l JOIN books b ON b.id=l.book_id ORDER BY l.id DESC''', 'prestamos'),
+    'traslados': ('''SELECT b.code codigo, a.name sala_origen, z.name sala_destino, t.person responsable,
+                       t.transferred_at fecha, t.notes observaciones FROM transfers t
+                       JOIN books b ON b.id=t.book_id JOIN rooms a ON a.id=t.from_room_id
+                       JOIN rooms z ON z.id=t.to_room_id ORDER BY t.id DESC''', 'traslados'),
+    'auditorias': ('''SELECT a.id auditoria, r.name sala, a.audited_at fecha, a.auditor auditor,
+                        b.code codigo, b.title titulo, i.result resultado, i.note detalle
+                        FROM audit_items i JOIN audits a ON a.id=i.audit_id
+                        JOIN rooms r ON r.id=a.room_id JOIN books b ON b.id=i.book_id
+                        ORDER BY a.id DESC,b.code''', 'auditorias')
+}
+
+
+@app.route('/reportes')
+def reports():
+    return render_template('reports.html')
+
+
+@app.route('/reportes/<kind>.csv')
+def download_csv(kind):
+    if kind not in EXPORTS: abort(404)
+    query, filename = EXPORTS[kind]
+    cur = connection().execute(query)
+    output = io.StringIO()
+    output.write('\ufeff')
+    writer = csv.writer(output, delimiter=';')
+    writer.writerow([x[0] for x in cur.description])
+    writer.writerows(cur.fetchall())
+    return Response(output.getvalue(), mimetype='text/csv; charset=utf-8',
+                    headers={'Content-Disposition': f'attachment; filename={filename}_{date.today().isoformat()}.csv'})
+
+
+@app.route('/actividad')
+def activity():
+    items = connection().execute('SELECT * FROM events ORDER BY id DESC LIMIT 300').fetchall()
+    return render_template('activity.html', items=items)
+
+
+if __name__ == '__main__':
+    with app.app_context(): init_db()
+    app.run(host='127.0.0.1', port=5000, debug=False)

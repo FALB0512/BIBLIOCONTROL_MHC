@@ -46,6 +46,7 @@ def init_db():
       id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'admin'
         CHECK(role IN ('admin','bibliotecario','consulta')),
+      active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS rooms (
       id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, location TEXT NOT NULL DEFAULT '',
@@ -89,6 +90,8 @@ def init_db():
     if 'role' not in [c['name'] for c in db.execute('PRAGMA table_info(users)')]:
         db.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin' "
                    "CHECK(role IN ('admin','bibliotecario','consulta'))")
+    if 'active' not in [c['name'] for c in db.execute('PRAGMA table_info(users)')]:
+        db.execute('ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))')
     db.commit()
 
 
@@ -111,6 +114,14 @@ def before():
             return redirect(url_for('setup'))
     elif endpoint not in allowed and not session.get('user_id'):
         return redirect(url_for('login'))
+    if session.get('user_id'):
+        current = connection().execute('SELECT role, active FROM users WHERE id=?',
+                                       (session['user_id'],)).fetchone()
+        if not current or not current['active']:
+            session.clear()
+            flash('Tu cuenta no está activa o la sesión expiró. Inicia sesión nuevamente.', 'danger')
+            return redirect(url_for('login'))
+        session['role'] = current['role']  # los cambios de rol aplican de inmediato
     if (request.method == 'POST' and session.get('user_id') and endpoint != 'logout'
             and session.get('role') not in WRITE_ROLES):
         flash('Tu rol de Consulta no permite modificar datos.', 'danger')
@@ -120,7 +131,8 @@ def before():
 @app.context_processor
 def context():
     return {'csrf_token': session.get('csrf', ''), 'current_user': session.get('username'),
-            'current_role': ROLES.get(session.get('role'), ''), 'today': date.today().isoformat()}
+            'current_role': ROLES.get(session.get('role'), ''), 'is_admin': session.get('role') == 'admin',
+            'today': date.today().isoformat()}
 
 
 def log(action, detail):
@@ -176,7 +188,7 @@ def login():
     if request.method == 'POST':
         username = val('username', 40)
         user = connection().execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
-        if user and check_password_hash(user['password_hash'], request.form.get('password', '')):
+        if user and user['active'] and check_password_hash(user['password_hash'], request.form.get('password', '')):
             session.clear()
             session.update(user_id=user['id'], username=user['username'], role=user['role'],
                            csrf=secrets.token_urlsafe(32))
@@ -470,6 +482,106 @@ def download_csv(kind):
     writer.writerows(cur.fetchall())
     return Response(output.getvalue(), mimetype='text/csv; charset=utf-8',
                     headers={'Content-Disposition': f'attachment; filename={filename}_{date.today().isoformat()}.csv'})
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if session.get('role') != 'admin':
+            flash('Solo un Administrador puede gestionar usuarios.', 'danger')
+            return redirect(url_for('dashboard'))
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def other_active_admins(user_id):
+    return connection().execute("SELECT count(*) FROM users WHERE role='admin' AND active=1 AND id<>?",
+                                (user_id,)).fetchone()[0]
+
+
+@app.route('/usuarios')
+@admin_required
+def users():
+    items = connection().execute('SELECT id, username, role, active, created_at FROM users ORDER BY username').fetchall()
+    return render_template('usuarios.html', items=items, roles=ROLES, me=session['user_id'])
+
+
+@app.post('/usuarios/nuevo')
+@admin_required
+def create_user():
+    db = connection()
+    try:
+        username, role = val('username', 40, True), val('role', 20, True)
+        password = request.form.get('password', '')
+        if role not in ROLES: raise ValueError('Rol inválido.')
+        if len(password) < 10: raise ValueError('La contraseña debe tener al menos 10 caracteres.')
+        with db:
+            db.execute('INSERT INTO users(username,password_hash,role) VALUES (?,?,?)',
+                       (username, generate_password_hash(password), role))
+            log('Usuario creado', f'{username} · {ROLES[role]}')
+        flash('Usuario creado.', 'success')
+    except (ValueError, sqlite3.IntegrityError) as ex:
+        flash('Ese nombre de usuario ya existe.' if isinstance(ex, sqlite3.IntegrityError) else str(ex), 'danger')
+    return redirect(url_for('users'))
+
+
+@app.post('/usuarios/<int:user_id>/rol')
+@admin_required
+def change_role(user_id):
+    db = connection()
+    user = db.execute('SELECT * FROM users WHERE id=?', (user_id,)).fetchone()
+    if not user: abort(404)
+    try:
+        role = val('role', 20, True)
+        if role not in ROLES: raise ValueError('Rol inválido.')
+        if user_id == session['user_id']: raise ValueError('No puedes cambiar tu propio rol.')
+        if user['role'] == 'admin' and role != 'admin' and not other_active_admins(user_id):
+            raise ValueError('Debe quedar al menos un Administrador activo.')
+        with db:
+            db.execute('UPDATE users SET role=? WHERE id=?', (role, user_id))
+            log('Rol cambiado', f"{user['username']}: {ROLES[role]}")
+        flash('Rol actualizado.', 'success')
+    except ValueError as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('users'))
+
+
+@app.post('/usuarios/<int:user_id>/estado')
+@admin_required
+def toggle_user(user_id):
+    db = connection()
+    user = db.execute('SELECT * FROM users WHERE id=?', (user_id,)).fetchone()
+    if not user: abort(404)
+    try:
+        if user_id == session['user_id']: raise ValueError('No puedes desactivar tu propia cuenta.')
+        if user['active'] and user['role'] == 'admin' and not other_active_admins(user_id):
+            raise ValueError('Debe quedar al menos un Administrador activo.')
+        new_state = 0 if user['active'] else 1
+        with db:
+            db.execute('UPDATE users SET active=? WHERE id=?', (new_state, user_id))
+            log('Estado de usuario', f"{user['username']}: {'activo' if new_state else 'inactivo'}")
+        flash('Estado actualizado.', 'success')
+    except ValueError as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('users'))
+
+
+@app.post('/usuarios/<int:user_id>/clave')
+@admin_required
+def reset_password(user_id):
+    db = connection()
+    user = db.execute('SELECT * FROM users WHERE id=?', (user_id,)).fetchone()
+    if not user: abort(404)
+    try:
+        password = request.form.get('password', '')
+        if len(password) < 10: raise ValueError('La contraseña debe tener al menos 10 caracteres.')
+        with db:
+            db.execute('UPDATE users SET password_hash=? WHERE id=?', (generate_password_hash(password), user_id))
+            log('Contraseña restablecida', user['username'])
+        flash('Contraseña actualizada.', 'success')
+    except ValueError as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('users'))
 
 
 @app.route('/actividad')

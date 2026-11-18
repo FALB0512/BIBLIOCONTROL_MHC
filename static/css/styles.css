@@ -40,3 +40,13 @@ body{background:#F3F6FB}
 .who{display:grid;line-height:1.25}.who b{font-size:13px;color:#0F172A}.who small{color:#64748B;font-size:11px}
 .user-box form{margin:0 0 0 4px}.user-box .exit{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .metrics .metric:nth-child(1){background:#EFF6FF;border-left-color:#2563EB}.metrics .metric:nth-child(2){background:#ECFDF5;border-left-color:#16A34A}.metrics .metric:nth-child(3){background:#F5F3FF;border-left-color:#7C3AED}.metrics .metric:nth-child(4){background:#FFFBEB;border-left-color:#D97706}.metrics .metric:nth-child(5){background:#FEF2F2;border-left-color:#DC2626}
+.icon-btn{display:inline-grid;place-items:center;width:34px;height:34px;border:0;border-radius:10px;font-size:15px;cursor:pointer;margin:0 3px;font-family:inherit;padding:0}
+.icon-btn.info{background:#E0F2FE;color:#0284C7}.icon-btn.danger{background:#FEE2E2;color:#DC2626}.icon-btn.success{background:#DCFCE7;color:#16A34A}
+.icon-btn:hover{filter:brightness(.95)}
+details summary.icon-btn{width:34px;height:34px;padding:0;border:0;background:#E0F2FE;color:#0284C7;justify-content:center}details summary.icon-btn:hover{background:#BAE6FD;color:#0369A1}
+th{background:#F8FAFC;color:#64748B;font-weight:600;font-size:12px;padding:12px 14px}
+th:not(:last-child)::after{content:" ⇅";color:#CBD5E1;font-size:10px}
+td{padding:13px 14px;color:#334155}
+tbody tr:hover td{background:#F8FAFC}
+.table-wrap{border-radius:12px}
+.tbl-foot{margin-top:12px;font-size:12px;color:#64748B}

@@ -8,12 +8,12 @@
     <input type="hidden" name="csrf" value="{{ csrf_token }}">
     <label>Código de área (100 a 2000)<input name="code" type="number" min="100" max="2000" required placeholder="Ej. 700"></label>
     <label>Nombre<input name="name" maxlength="100" required placeholder="Ej. TECNICO"></label>
-    <button class="button primary form-end">Guardar área</button>
+    <button class="button success form-end">Guardar área</button>
   </form>
 </section>
 
 <section class="panel">
-  <h2>Áreas registradas</h2>
+  <div class="panel-title"><h2>▣ Áreas registradas</h2><div class="search-box">🔍<input type="search" data-search placeholder="Buscar área..."></div></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Código</th><th>Nombre</th><th>Ejemplares</th><th>Estado</th><th>Acción</th></tr></thead>
@@ -23,11 +23,11 @@
           <td><b>{{ a.code }}</b></td>
           <td>{{ a.name }}</td>
           <td>{{ a.total }}</td>
-          <td>{{ 'Activa' if a.active else 'Inactiva' }}</td>
+          <td><span class="status {{ 'activa' if a.active else 'inactiva' }}">{{ 'Activa' if a.active else 'Inactiva' }}</span></td>
           <td>
             <form method="post" action="{{ url_for('toggle_area', area_id=a.id) }}" class="inline-form" data-confirm="¿Confirmas el cambio de estado de esta área?">
               <input type="hidden" name="csrf" value="{{ csrf_token }}">
-              <button class="button small">{{ 'Desactivar' if a.active else 'Activar' }}</button>
+              <button class="act-btn {{ 'danger' if a.active else 'success' }}"><span data-icon="{{ 'power' if a.active else 'check' }}"></span>{{ 'Desactivar' if a.active else 'Activar' }}</button>
             </form>
           </td>
         </tr>

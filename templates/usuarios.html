@@ -9,12 +9,12 @@
     <label>Usuario<input name="username" maxlength="40" required></label>
     <label>Contraseña (mín. 10 caracteres)<input name="password" type="password" minlength="10" required></label>
     <label>Rol<select name="role">{% for key, label in roles.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>
-    <button class="button primary">Crear usuario</button>
+    <button class="button success">Crear usuario</button>
   </form>
 </section>
 
 <section class="panel">
-  <h2>Cuentas</h2>
+  <div class="panel-title"><h2>☺ Cuentas</h2><div class="search-box">🔍<input type="search" data-search placeholder="Buscar usuario..."></div></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
@@ -27,23 +27,23 @@
             <form method="post" action="{{ url_for('change_role', user_id=u.id) }}" class="inline-form">
               <input type="hidden" name="csrf" value="{{ csrf_token }}">
               <select name="role">{% for key, label in roles.items() %}<option value="{{ key }}" {% if u.role == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-              <button class="button small">Guardar</button>
+              <button class="button small info">Guardar</button>
             </form>
             {% else %}{{ roles[u.role] }}{% endif %}
           </td>
-          <td>{{ 'Activo' if u.active else 'Inactivo' }}</td>
+          <td><span class="status {{ 'activa' if u.active else 'inactiva' }}">{{ 'Activo' if u.active else 'Inactivo' }}</span></td>
           <td>{{ u.created_at[:10] }}</td>
           <td>
             {% if u.id != me %}
             <form method="post" action="{{ url_for('toggle_user', user_id=u.id) }}" class="inline-form" data-confirm="¿Confirmas el cambio de estado de esta cuenta?">
               <input type="hidden" name="csrf" value="{{ csrf_token }}">
-              <button class="button small">{{ 'Desactivar' if u.active else 'Activar' }}</button>
+              <button class="act-btn {{ 'danger' if u.active else 'success' }}"><span data-icon="{{ 'power' if u.active else 'check' }}"></span>{{ 'Desactivar' if u.active else 'Activar' }}</button>
             </form>
             {% endif %}
             <form method="post" action="{{ url_for('reset_password', user_id=u.id) }}" class="inline-form">
               <input type="hidden" name="csrf" value="{{ csrf_token }}">
               <input name="password" type="password" minlength="10" placeholder="Nueva contraseña" required>
-              <button class="button small">Restablecer</button>
+              <button class="button small warning">Restablecer</button>
             </form>
           </td>
         </tr>

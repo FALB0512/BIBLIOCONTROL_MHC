@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block heading %}Etiqueta QR{% endblock %}
+{% block subheading %}Imprime la etiqueta y pégala en el ejemplar. El código QR contiene el código del ejemplar.{% endblock %}
+{% block content %}
+<div class="no-print"><a href="{{ url_for('books') }}">← Volver al inventario</a></div>
+<div class="qr-label">
+  {{ svg|safe }}
+  <code>{{ book.code }}</code>
+  <p>{{ book.title }}</p>
+  <p>{{ book.room }}</p>
+</div>
+<div class="no-print" style="text-align:center"><button class="button primary" onclick="window.print()">Imprimir etiqueta</button></div>
+{% endblock %}

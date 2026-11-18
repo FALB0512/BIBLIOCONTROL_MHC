@@ -7,6 +7,8 @@ from datetime import date, datetime
 from functools import wraps
 from pathlib import Path
 
+import qrcode
+import qrcode.image.svg
 from flask import (Flask, abort, flash, g, redirect, render_template, request,
                    Response, session, url_for)
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -286,6 +288,16 @@ def books():
     sql += ' ORDER BY b.id DESC'
     return render_template('books.html', items=db.execute(sql, args).fetchall(),
                            rooms=db.execute('SELECT * FROM rooms WHERE active=1 ORDER BY name').fetchall(), q=q, chosen_room=room)
+
+
+@app.get('/libros/<int:book_id>/qr')
+def book_qr(book_id):
+    book = connection().execute('''SELECT b.*, r.name room FROM books b JOIN rooms r ON r.id=b.room_id
+                                   WHERE b.id=?''', (book_id,)).fetchone()
+    if not book: abort(404)
+    svg = qrcode.make(book['code'], image_factory=qrcode.image.svg.SvgPathImage,
+                      box_size=10, border=2).to_string(encoding='unicode')
+    return render_template('book_qr.html', book=book, svg=svg)
 
 
 @app.post('/libros/<int:book_id>/editar')

@@ -14,7 +14,7 @@
 </section>
 
 <section class="panel">
-  <h2>Cuentas</h2>
+  <div class="panel-title"><h2>☺ Cuentas</h2><div class="search-box">🔍<input type="search" data-search placeholder="Buscar usuario..."></div></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
@@ -31,13 +31,13 @@
             </form>
             {% else %}{{ roles[u.role] }}{% endif %}
           </td>
-          <td>{{ 'Activo' if u.active else 'Inactivo' }}</td>
+          <td><span class="status {{ 'activa' if u.active else 'inactiva' }}">{{ 'Activo' if u.active else 'Inactivo' }}</span></td>
           <td>{{ u.created_at[:10] }}</td>
           <td>
             {% if u.id != me %}
             <form method="post" action="{{ url_for('toggle_user', user_id=u.id) }}" class="inline-form" data-confirm="¿Confirmas el cambio de estado de esta cuenta?">
               <input type="hidden" name="csrf" value="{{ csrf_token }}">
-              <button class="button small">{{ 'Desactivar' if u.active else 'Activar' }}</button>
+              <button class="button small {{ 'danger' if u.active else '' }}">⏻ {{ 'Desactivar' if u.active else 'Activar' }}</button>
             </form>
             {% endif %}
             <form method="post" action="{{ url_for('reset_password', user_id=u.id) }}" class="inline-form">

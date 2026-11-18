@@ -13,7 +13,7 @@
 </section>
 
 <section class="panel">
-  <h2>Áreas registradas</h2>
+  <div class="panel-title"><h2>▣ Áreas registradas</h2><div class="search-box">🔍<input type="search" data-search placeholder="Buscar área..."></div></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Código</th><th>Nombre</th><th>Ejemplares</th><th>Estado</th><th>Acción</th></tr></thead>
@@ -23,11 +23,11 @@
           <td><b>{{ a.code }}</b></td>
           <td>{{ a.name }}</td>
           <td>{{ a.total }}</td>
-          <td>{{ 'Activa' if a.active else 'Inactiva' }}</td>
+          <td><span class="status {{ 'activa' if a.active else 'inactiva' }}">{{ 'Activa' if a.active else 'Inactiva' }}</span></td>
           <td>
             <form method="post" action="{{ url_for('toggle_area', area_id=a.id) }}" class="inline-form" data-confirm="¿Confirmas el cambio de estado de esta área?">
               <input type="hidden" name="csrf" value="{{ csrf_token }}">
-              <button class="button small">{{ 'Desactivar' if a.active else 'Activar' }}</button>
+              <button class="button small {{ 'danger' if a.active else '' }}">⏻ {{ 'Desactivar' if a.active else 'Activar' }}</button>
             </form>
           </td>
         </tr>

@@ -97,6 +97,14 @@ def init_db():
       book_id INTEGER NOT NULL REFERENCES books(id),
       result TEXT NOT NULL CHECK(result IN ('Encontrado','No encontrado','Novedad')),
       note TEXT NOT NULL DEFAULT '', UNIQUE(audit_id,book_id));
+    CREATE TABLE IF NOT EXISTS areas (
+      id INTEGER PRIMARY KEY, code INTEGER NOT NULL UNIQUE CHECK(code BETWEEN 100 AND 2000),
+      name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS doc_types (code TEXT PRIMARY KEY, name TEXT NOT NULL);
+    INSERT OR IGNORE INTO doc_types(code,name) VALUES
+      ('L','Libro'),('N','Norma'),('DT','Documento técnico'),('DI','Diccionario'),
+      ('M','Manual'),('RE','Revista'),('G','Guía'),('CA','Catálogo');
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY, actor TEXT NOT NULL, action TEXT NOT NULL,
       detail TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
@@ -107,6 +115,13 @@ def init_db():
                    "CHECK(role IN ('admin','bibliotecario','consulta'))")
     if 'active' not in [c['name'] for c in db.execute('PRAGMA table_info(users)')]:
         db.execute('ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))')
+    existing = [c['name'] for c in db.execute('PRAGMA table_info(books)')]
+    for column, ddl in [('area_id', 'INTEGER REFERENCES areas(id)'), ('doc_type', 'TEXT REFERENCES doc_types(code)'),
+                        ('seq', 'INTEGER')]:
+        if column not in existing:
+            db.execute(f'ALTER TABLE books ADD COLUMN {column} {ddl}')
+    db.execute('''CREATE UNIQUE INDEX IF NOT EXISTS book_identifier ON books(area_id, doc_type, seq)
+                  WHERE area_id IS NOT NULL''')
     db.commit()
 
 
@@ -335,6 +350,54 @@ def toggle_room(room_id):
     return redirect(url_for('rooms'))
 
 
+def identifier_parts(db, area_id, doc_type):
+    """Valida área activa y tipo; devuelve el código numérico del área."""
+    area = db.execute('SELECT code FROM areas WHERE id=? AND active=1', (area_id,)).fetchone()
+    if not area: raise ValueError('Selecciona un área activa.')
+    if not db.execute('SELECT 1 FROM doc_types WHERE code=?', (doc_type,)).fetchone():
+        raise ValueError('Tipo de documento inválido.')
+    return area['code']
+
+
+def next_identifier(db, area_id, doc_type):
+    area_code = identifier_parts(db, area_id, doc_type)
+    seq = db.execute('SELECT COALESCE(MAX(seq),0)+1 FROM books WHERE area_id=? AND doc_type=?',
+                     (area_id, doc_type)).fetchone()[0]
+    return f'{area_code} {doc_type}-{seq:03d}', seq
+
+
+@app.route('/areas', methods=['GET', 'POST'])
+def areas():
+    db = connection()
+    if request.method == 'POST':
+        try:
+            code, name = as_int('code'), val('name', 100, True)
+            if not 100 <= code <= 2000: raise ValueError('El código de área debe estar entre 100 y 2000.')
+            with db:
+                db.execute('INSERT INTO areas(code,name) VALUES (?,?)', (code, name))
+                log('Área creada', f'{code} · {name}')
+            flash('Área registrada.', 'success')
+        except (ValueError, sqlite3.IntegrityError) as ex:
+            flash('Ese código de área ya existe.' if isinstance(ex, sqlite3.IntegrityError) else str(ex), 'danger')
+        return redirect(url_for('areas'))
+    items = db.execute('''SELECT a.*, (SELECT COUNT(*) FROM books b WHERE b.area_id=a.id) total
+                          FROM areas a ORDER BY a.code''').fetchall()
+    return render_template('areas.html', items=items, types=db.execute('SELECT * FROM doc_types ORDER BY rowid').fetchall())
+
+
+@app.post('/areas/<int:area_id>/estado')
+def toggle_area(area_id):
+    db = connection()
+    area = db.execute('SELECT * FROM areas WHERE id=?', (area_id,)).fetchone()
+    if not area: abort(404)
+    new_state = 0 if area['active'] else 1
+    with db:
+        db.execute('UPDATE areas SET active=? WHERE id=?', (new_state, area_id))
+        log('Estado de área', f"{area['code']}: {'activa' if new_state else 'inactiva'}")
+    flash('Estado del área actualizado.', 'success')
+    return redirect(url_for('areas'))
+
+
 @app.route('/libros', methods=['GET', 'POST'])
 def books():
     db = connection()
@@ -343,17 +406,20 @@ def books():
             room_id = as_int('room_id')
             if not db.execute('SELECT 1 FROM rooms WHERE id=? AND active=1', (room_id,)).fetchone():
                 raise ValueError('La sala seleccionada no existe.')
-            fields = [val('code', 40, True), val('title', 200, True), val('author', 150),
+            area_id, doc_type = as_int('area_id'), val('doc_type', 5, True)
+            fields = [val('title', 200, True), val('author', 150),
                       val('category', 80), val('isbn', 30), val('publisher', 100)]
             condition, notes = val('condition', 20), val('notes', 500)
             if condition not in ('Bueno','Regular','Deteriorado'): raise ValueError('Estado físico inválido.')
             with db:
-                db.execute('''INSERT INTO books(code,title,author,category,isbn,publisher,room_id,condition,notes)
-                              VALUES (?,?,?,?,?,?,?,?,?)''', (*fields, room_id, condition, notes))
-                log('Libro registrado', f'{fields[0]} · {fields[1]}')
-            flash('Ejemplar agregado al inventario.', 'success')
+                code, seq = next_identifier(db, area_id, doc_type)
+                db.execute('''INSERT INTO books(code,title,author,category,isbn,publisher,room_id,condition,notes,
+                              area_id,doc_type,seq) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
+                           (code, *fields, room_id, condition, notes, area_id, doc_type, seq))
+                log('Libro registrado', f'{code} · {fields[0]}')
+            flash(f'Ejemplar registrado con código {code}.', 'success')
         except (ValueError, sqlite3.IntegrityError) as ex:
-            flash(str(ex), 'danger')
+            flash('No se pudo generar el código, intenta de nuevo.' if isinstance(ex, sqlite3.IntegrityError) else str(ex), 'danger')
         return redirect(url_for('books'))
     q = request.args.get('q', '').strip()[:100]
     room = request.args.get('room', '').strip()
@@ -366,7 +432,9 @@ def books():
         sql += ' AND b.room_id=?'; args.append(int(room))
     sql += ' ORDER BY b.id DESC'
     return render_template('books.html', items=db.execute(sql, args).fetchall(),
-                           rooms=db.execute('SELECT * FROM rooms WHERE active=1 ORDER BY name').fetchall(), q=q, chosen_room=room)
+                           rooms=db.execute('SELECT * FROM rooms WHERE active=1 ORDER BY name').fetchall(), q=q, chosen_room=room,
+                           areas=db.execute('SELECT * FROM areas WHERE active=1 ORDER BY code').fetchall(),
+                           types=db.execute('SELECT * FROM doc_types ORDER BY rowid').fetchall())
 
 
 @app.get('/libros/<int:book_id>/qr')
@@ -387,13 +455,20 @@ def edit_book(book_id):
                   val('isbn', 30), val('publisher', 100), val('condition', 20), val('notes', 500))
         if fields[5] not in ('Bueno','Regular','Deteriorado'): raise ValueError('Estado físico inválido.')
         with db:
-            cur = db.execute('''UPDATE books SET title=?,author=?,category=?,isbn=?,publisher=?,condition=?,notes=?
-                                WHERE id=?''', (*fields, book_id))
-            if not cur.rowcount: abort(404)
-            log('Libro editado', f'ID {book_id}: {fields[0]}')
-        flash('Datos bibliográficos actualizados.', 'success')
-    except ValueError as ex:
-        flash(str(ex), 'danger')
+            book = db.execute('SELECT * FROM books WHERE id=?', (book_id,)).fetchone()
+            if not book: abort(404)
+            extra_sql, extra_args, new_code = '', [], None
+            if book['area_id'] is None:  # libro anterior al identificador de proceso: se le asigna uno nuevo
+                if not request.form.get('area_id'): raise ValueError('Selecciona área y tipo para asignar el nuevo código.')
+                area_id, doc_type = as_int('area_id'), val('doc_type', 5, True)
+                new_code, seq = next_identifier(db, area_id, doc_type)
+                extra_sql, extra_args = ', code=?, area_id=?, doc_type=?, seq=?', [new_code, area_id, doc_type, seq]
+            db.execute(f'''UPDATE books SET title=?,author=?,category=?,isbn=?,publisher=?,condition=?,notes=?{extra_sql}
+                           WHERE id=?''', (*fields, *extra_args, book_id))
+            log('Libro editado', f"{new_code or book['code']}: {fields[0]}")
+        flash(f'Datos actualizados. Nuevo código: {new_code}.' if new_code else 'Datos bibliográficos actualizados.', 'success')
+    except (ValueError, sqlite3.IntegrityError) as ex:
+        flash('No se pudo generar el código, intenta de nuevo.' if isinstance(ex, sqlite3.IntegrityError) else str(ex), 'danger')
     return redirect(url_for('books'))
 
 

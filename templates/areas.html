@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block heading %}Áreas{% endblock %}
+{% block subheading %}Áreas de clasificación (100 a 2000) que forman el identificador de cada ejemplar.{% endblock %}
+{% block content %}
+<section class="panel">
+  <h2>Registrar área</h2>
+  <form method="post" class="form-grid cols-3">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <label>Código de área (100 a 2000)<input name="code" type="number" min="100" max="2000" required placeholder="Ej. 700"></label>
+    <label>Nombre<input name="name" maxlength="100" required placeholder="Ej. TECNICO"></label>
+    <button class="button primary form-end">Guardar área</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Áreas registradas</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Código</th><th>Nombre</th><th>Ejemplares</th><th>Estado</th><th>Acción</th></tr></thead>
+      <tbody>
+      {% for a in items %}
+        <tr>
+          <td><b>{{ a.code }}</b></td>
+          <td>{{ a.name }}</td>
+          <td>{{ a.total }}</td>
+          <td>{{ 'Activa' if a.active else 'Inactiva' }}</td>
+          <td>
+            <form method="post" action="{{ url_for('toggle_area', area_id=a.id) }}" class="inline-form" data-confirm="¿Confirmas el cambio de estado de esta área?">
+              <input type="hidden" name="csrf" value="{{ csrf_token }}">
+              <button class="button small">{{ 'Desactivar' if a.active else 'Activar' }}</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="empty">Aún no hay áreas. Registra la primera para poder crear ejemplares.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Tipos de documento</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Letra</th><th>Tipo</th></tr></thead>
+      <tbody>{% for t in types %}<tr><td><b>{{ t.code }}</b></td><td>{{ t.name }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

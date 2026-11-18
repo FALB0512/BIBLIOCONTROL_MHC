@@ -2,6 +2,7 @@
 {% if current_user %}<aside class="sidebar"><a class="brand" href="{{url_for('dashboard')}}"><img class="brand-logo" src="{{url_for('static',filename='img/logo.jpg')}}" alt="MHC"><span>BIBLIOCONTROL<small>MHC · Gestión bibliográfica</small></span></a><nav>
 <a href="{{url_for('dashboard')}}" class="{{'selected' if request.endpoint=='dashboard' else ''}}">◫ &nbsp; Panel general</a>
 <a href="{{url_for('rooms')}}" class="{{'selected' if request.endpoint in ['rooms','edit_room'] else ''}}">▤ &nbsp; Salas de reunión</a>
+<a href="{{url_for('areas')}}" class="{{'selected' if request.endpoint=='areas' else ''}}">▣ &nbsp; Áreas</a>
 <a href="{{url_for('books')}}" class="{{'selected' if request.endpoint in ['books','edit_book'] else ''}}">▦ &nbsp; Inventario</a>
 <a href="{{url_for('loans')}}" class="{{'selected' if request.endpoint in ['loans','return_book'] else ''}}">⇄ &nbsp; Préstamos y devoluciones</a>
 <a href="{{url_for('transfers')}}" class="{{'selected' if request.endpoint=='transfers' else ''}}">↗ &nbsp; Traslados</a>

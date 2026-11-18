@@ -14,7 +14,37 @@ check:'<path d="M20 6 9 17l-5-5"/>',
 ban:'<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
 qr:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 20h1v1h-1zM17 20h1M20 14v3"/>'};
 document.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[el.dataset.icon]||'')+'</svg>'});
-document.querySelectorAll('form[data-confirm]').forEach(form=>form.addEventListener('submit',event=>{if(!window.confirm(form.dataset.confirm)){event.preventDefault()}}));
+const toast=msg=>{const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.append(t);setTimeout(()=>t.remove(),3500)};
+const confirmDlg=document.createElement('dialog');confirmDlg.className='modal small';
+confirmDlg.innerHTML='<div class="modal-head"><h3>Confirmar acción</h3></div><form method="dialog"><p class="confirm-msg"></p><div class="modal-foot"><button value="cancel" class="button secondary">Cancelar</button><button value="ok" class="button info">Confirmar</button></div></form>';
+document.body.append(confirmDlg);
+let pendingOk=null;
+confirmDlg.addEventListener('close',()=>{const fn=pendingOk;pendingOk=null;if(confirmDlg.returnValue==='ok'&&fn)fn()});
+const askConfirm=(msg,fn)=>{pendingOk=fn;confirmDlg.querySelector('.confirm-msg').textContent=msg;confirmDlg.showModal()};
+document.querySelectorAll('details').forEach(d=>{
+  const sum=d.querySelector('summary');const form=d.querySelector('form');if(!sum||!form)return;
+  const dlg=document.createElement('dialog');dlg.className='modal';
+  const row=d.closest('tr');const subject=row&&row.querySelector('td')?row.querySelector('td').textContent.trim().split('\n')[0]:'';
+  dlg.innerHTML='<div class="modal-head"><div><h3>'+sum.textContent.trim()+'</h3><small>'+subject+'</small></div><button type="button" class="modal-x" aria-label="Cerrar">×</button></div>';
+  form.classList.remove('inline-form');form.classList.add('modal-form');dlg.append(form);
+  dlg.querySelector('.modal-x').onclick=()=>dlg.close();
+  const btn=document.createElement('button');btn.type='button';btn.className=sum.className;btn.innerHTML=sum.innerHTML;btn.onclick=()=>dlg.showModal();
+  d.replaceWith(btn);document.body.append(dlg);
+});
+document.addEventListener('input',e=>e.target.classList&&e.target.classList.remove('field-error'));
+document.querySelectorAll('form').forEach(f=>{
+  f.noValidate=true;
+  f.addEventListener('submit',e=>{
+    if(f.dataset.ok==='1'){f.dataset.ok='';return}
+    if(!f.checkValidity()){
+      e.preventDefault();
+      const bad=f.querySelector(':invalid');
+      if(bad){bad.classList.add('field-error');bad.focus();const lbl=bad.closest('label');const name=lbl&&lbl.firstChild?lbl.firstChild.textContent.trim():'';toast(name?'Completa el campo: '+name:'Completa los campos obligatorios')}
+      return;
+    }
+    if(f.dataset.confirm){e.preventDefault();askConfirm(f.dataset.confirm,()=>{f.dataset.ok='1';f.requestSubmit()})}
+  });
+});
 const SIZE=10;
 const tables=[...document.querySelectorAll('.table-wrap')].map(w=>{const f=document.createElement('div');f.className='tbl-foot';w.after(f);return {w,f,page:0}});
 function renderTable(t){

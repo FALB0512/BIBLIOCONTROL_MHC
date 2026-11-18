@@ -60,3 +60,18 @@ td:last-child{white-space:nowrap}
 td:last-child>*{display:inline-flex;align-items:center;margin:2px 6px 2px 0;vertical-align:middle}
 .sidebar nav a{display:flex;align-items:center}.sidebar nav a span[data-icon]{display:inline-flex;margin-right:12px;width:18px}
 .sidebar nav a span[data-icon] svg{width:18px;height:18px}
+dialog:not([open]){display:none!important}
+dialog.modal{border:0;border-radius:16px;padding:0;width:min(520px,92vw);box-shadow:0 20px 50px rgba(15,23,42,.25);color:#0F172A}
+dialog.modal.small{width:min(420px,92vw)}
+dialog.modal::backdrop{background:rgba(15,23,42,.45)}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid #E2E8F0}
+.modal-head h3{margin:0;font-size:16px;color:#0F172A}.modal-head small{color:#64748B;font-size:12px}
+.modal-x{border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:#64748B}
+.modal-form{display:grid;gap:12px;padding:20px 22px 22px}
+.modal-form input,.modal-form select{width:100%}
+.modal-form>.button{justify-self:end}
+.modal-form>button,.modal-form .button{justify-self:end}
+.confirm-msg{margin:20px 22px 4px;font-size:14px;color:#334155}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 22px 20px}
+.field-error{border-color:#DC2626!important;box-shadow:0 0 0 3px #FEE2E2}
+.toast{position:fixed;top:18px;right:18px;background:#0F172A;color:#fff;padding:12px 16px;border-radius:12px;font-size:13px;box-shadow:0 10px 30px rgba(15,23,42,.25);z-index:100}

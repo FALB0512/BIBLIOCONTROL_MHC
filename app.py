@@ -200,7 +200,7 @@ def register_failure(username):
 
 def safe_cell(value):
     """Evita que Excel interprete texto escrito por usuarios como fórmula."""
-    if isinstance(value, str) and value[:1] in '=+-@':
+    if isinstance(value, str) and value and value[0] in '=+-@':
         return "'" + value
     return value
 
@@ -615,7 +615,10 @@ def audit_detail(audit_id):
 EXPORTS = {
     'inventario': ('''SELECT b.code codigo, b.title titulo, b.author autor, b.category categoria,
                        b.isbn isbn, r.name sala, b.condition estado_fisico, b.status disponibilidad,
-                       b.notes observaciones FROM books b JOIN rooms r ON r.id=b.room_id ORDER BY r.name,b.code''', 'inventario'),
+                       b.notes observaciones,
+                       a.code area_codigo, b.doc_type tipo_documento, b.seq consecutivo
+                       FROM books b JOIN rooms r ON r.id=b.room_id LEFT JOIN areas a ON a.id=b.area_id
+                       ORDER BY r.name,b.code''', 'inventario'),
     'prestamos': ('''SELECT b.code codigo, b.title titulo, l.borrower prestatario, l.department dependencia,
                       l.loan_date fecha_prestamo, l.due_date fecha_limite, l.return_date fecha_devolucion,
                       l.notes observaciones FROM loans l JOIN books b ON b.id=l.book_id ORDER BY l.id DESC''', 'prestamos'),
@@ -770,7 +773,7 @@ def download_xlsx(kind):
         ws.append(list(row))
         for cell in ws[ws.max_row]:
             # Texto que empiece por = + - @ se guarda como texto, no como fórmula.
-            if isinstance(cell.value, str) and cell.value[:1] in '=+-@':
+            if isinstance(cell.value, str) and cell.value and cell.value[0] in '=+-@':
                 cell.data_type = 's'
     ws.freeze_panes = 'A2'
     ws.auto_filter.ref = ws.dimensions

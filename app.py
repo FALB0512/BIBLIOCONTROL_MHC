@@ -5,9 +5,10 @@ import os
 import secrets
 import sqlite3
 import time
-from datetime import date, datetime
+from datetime import date
 from functools import wraps
 from pathlib import Path
+from urllib.parse import urlparse
 
 import qrcode
 import qrcode.image.svg
@@ -140,7 +141,7 @@ def before():
     if (request.method == 'POST' and session.get('user_id') and endpoint != 'logout'
             and session.get('role') not in WRITE_ROLES):
         flash('Tu rol de Consulta no permite modificar datos.', 'danger')
-        return redirect(request.referrer or url_for('dashboard'))
+        return redirect(safe_back())
 
 
 @app.context_processor
@@ -149,6 +150,14 @@ def context():
             'current_role': ROLES.get(session.get('role'), ''), 'is_admin': session.get('role') == 'admin',
             'can_write': session.get('role') in WRITE_ROLES,
             'today': date.today().isoformat()}
+
+
+def safe_back():
+    """Vuelve a la página anterior solo si es de este mismo sitio; si no, al panel."""
+    ref = urlparse(request.referrer or '')
+    if ref.netloc == request.host and ref.path:
+        return ref.path + (f'?{ref.query}' if ref.query else '')
+    return url_for('dashboard')
 
 
 def fingerprint(password_hash):

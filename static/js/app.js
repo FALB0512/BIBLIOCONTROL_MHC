@@ -45,3 +45,22 @@ document.querySelectorAll('input[data-search]').forEach(input=>input.addEventLis
   tables.filter(t=>section.contains(t.w)).forEach(t=>{t.page=0;renderTable(t)});
 }));
 tables.forEach(renderTable);
+document.querySelectorAll('.timeline').forEach(tl=>{
+  const items=[...tl.children];const TL=5;let page=0;
+  const f=document.createElement('div');f.className='tbl-foot';tl.after(f);
+  const render=()=>{
+    const pages=Math.max(1,Math.ceil(items.length/TL));
+    page=Math.min(page,pages-1);
+    items.forEach((e,i)=>{e.style.display=(i>=page*TL&&i<(page+1)*TL)?'':'none'});
+    f.innerHTML='';
+    if(pages>1){
+      const p=document.createElement('div');p.className='pager';
+      const btn=(label,to,on,disabled)=>{const b=document.createElement('button');b.textContent=label;b.disabled=disabled;if(on)b.className='on';b.onclick=()=>{page=to;render()};return b};
+      p.append(btn('‹',page-1,false,page===0));
+      for(let i=0;i<pages;i++)p.append(btn(String(i+1),i,i===page,false));
+      p.append(btn('›',page+1,false,page>=pages-1));
+      f.append(p);
+    }
+  };
+  render();
+});

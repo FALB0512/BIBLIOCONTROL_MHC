@@ -37,7 +37,7 @@
             {% if u.id != me %}
             <form method="post" action="{{ url_for('toggle_user', user_id=u.id) }}" class="inline-form" data-confirm="¿Confirmas el cambio de estado de esta cuenta?">
               <input type="hidden" name="csrf" value="{{ csrf_token }}">
-              <button class="icon-btn {{ 'danger' if u.active else 'success' }}" title="{{ 'Desactivar' if u.active else 'Activar' }}">⏻</button>
+              <button class="act-btn {{ 'danger' if u.active else 'success' }}"><span data-icon="{{ 'power' if u.active else 'check' }}"></span>{{ 'Desactivar' if u.active else 'Activar' }}</button>
             </form>
             {% endif %}
             <form method="post" action="{{ url_for('reset_password', user_id=u.id) }}" class="inline-form">

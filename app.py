@@ -44,7 +44,9 @@ def init_db():
     db.executescript('''
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+      password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'admin'
+        CHECK(role IN ('admin','bibliotecario','consulta')),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS rooms (
       id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, location TEXT NOT NULL DEFAULT '',
       responsible TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1,
@@ -83,7 +85,15 @@ def init_db():
       id INTEGER PRIMARY KEY, actor TEXT NOT NULL, action TEXT NOT NULL,
       detail TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
     ''')
+    # Migración: bases de datos creadas antes de los roles.
+    if 'role' not in [c['name'] for c in db.execute('PRAGMA table_info(users)')]:
+        db.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin' "
+                   "CHECK(role IN ('admin','bibliotecario','consulta'))")
     db.commit()
+
+
+ROLES = {'admin': 'Administrador', 'bibliotecario': 'Bibliotecario', 'consulta': 'Consulta'}
+WRITE_ROLES = {'admin', 'bibliotecario'}
 
 
 @app.before_request
@@ -101,11 +111,16 @@ def before():
             return redirect(url_for('setup'))
     elif endpoint not in allowed and not session.get('user_id'):
         return redirect(url_for('login'))
+    if (request.method == 'POST' and session.get('user_id') and endpoint != 'logout'
+            and session.get('role') not in WRITE_ROLES):
+        flash('Tu rol de Consulta no permite modificar datos.', 'danger')
+        return redirect(request.referrer or url_for('dashboard'))
 
 
 @app.context_processor
 def context():
-    return {'csrf_token': session.get('csrf', ''), 'current_user': session.get('username'), 'today': date.today().isoformat()}
+    return {'csrf_token': session.get('csrf', ''), 'current_user': session.get('username'),
+            'current_role': ROLES.get(session.get('role'), ''), 'today': date.today().isoformat()}
 
 
 def log(action, detail):
@@ -148,7 +163,7 @@ def setup():
         if len(password) < 10:
             flash('La contraseña debe tener al menos 10 caracteres.', 'danger')
         else:
-            connection().execute('INSERT INTO users(username,password_hash) VALUES (?,?)',
+            connection().execute("INSERT INTO users(username,password_hash,role) VALUES (?,?,'admin')",
                                  (username, generate_password_hash(password)))
             connection().commit()
             flash('Administrador creado. Inicia sesión.', 'success')
@@ -163,7 +178,8 @@ def login():
         user = connection().execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
         if user and check_password_hash(user['password_hash'], request.form.get('password', '')):
             session.clear()
-            session.update(user_id=user['id'], username=user['username'], csrf=secrets.token_urlsafe(32))
+            session.update(user_id=user['id'], username=user['username'], role=user['role'],
+                           csrf=secrets.token_urlsafe(32))
             return redirect(url_for('dashboard'))
         flash('Usuario o contraseña incorrectos.', 'danger')
     return render_template('login.html')

@@ -1,8 +1,10 @@
 import csv
+import hashlib
 import io
 import os
 import secrets
 import sqlite3
+import time
 from datetime import date, datetime
 from functools import wraps
 from pathlib import Path
@@ -127,9 +129,10 @@ def before():
     elif endpoint not in allowed and not session.get('user_id'):
         return redirect(url_for('login'))
     if session.get('user_id'):
-        current = connection().execute('SELECT role, active FROM users WHERE id=?',
+        current = connection().execute('SELECT role, active, password_hash FROM users WHERE id=?',
                                        (session['user_id'],)).fetchone()
-        if not current or not current['active']:
+        if (not current or not current['active']
+                or session.get('pwh') != fingerprint(current['password_hash'])):
             session.clear()
             flash('Tu cuenta no está activa o la sesión expiró. Inicia sesión nuevamente.', 'danger')
             return redirect(url_for('login'))
@@ -145,6 +148,36 @@ def context():
     return {'csrf_token': session.get('csrf', ''), 'current_user': session.get('username'),
             'current_role': ROLES.get(session.get('role'), ''), 'is_admin': session.get('role') == 'admin',
             'today': date.today().isoformat()}
+
+
+def fingerprint(password_hash):
+    """Huella del hash de contraseña: si cambia, las sesiones anteriores dejan de ser válidas."""
+    return hashlib.sha256(password_hash.encode()).hexdigest()
+
+
+LOGIN_FAILS = {}  # usuario -> (intentos, inicio de la ventana, bloqueado hasta)
+MAX_FAILS, FAIL_WINDOW, LOCK_SECONDS = 5, 900, 900
+
+
+def login_blocked(username):
+    entry = LOGIN_FAILS.get(username)
+    return bool(entry) and entry[2] > time.time()
+
+
+def register_failure(username):
+    now = time.time()
+    count, since, _ = LOGIN_FAILS.get(username, (0, now, 0))
+    if now - since > FAIL_WINDOW:
+        count, since = 0, now
+    count += 1
+    LOGIN_FAILS[username] = (count, since, now + LOCK_SECONDS if count >= MAX_FAILS else 0)
+
+
+def safe_cell(value):
+    """Evita que Excel interprete texto escrito por usuarios como fórmula."""
+    if isinstance(value, str) and value[:1] in '=+-@':
+        return "'" + value
+    return value
 
 
 def log(action, detail):
@@ -199,12 +232,18 @@ def setup():
 def login():
     if request.method == 'POST':
         username = val('username', 40)
+        key = username.lower()
+        if login_blocked(key):
+            flash('Demasiados intentos fallidos. Espera 15 minutos e inténtalo de nuevo.', 'danger')
+            return render_template('login.html')
         user = connection().execute('SELECT * FROM users WHERE username=?', (username,)).fetchone()
         if user and user['active'] and check_password_hash(user['password_hash'], request.form.get('password', '')):
+            LOGIN_FAILS.pop(key, None)
             session.clear()
             session.update(user_id=user['id'], username=user['username'], role=user['role'],
-                           csrf=secrets.token_urlsafe(32))
+                           pwh=fingerprint(user['password_hash']), csrf=secrets.token_urlsafe(32))
             return redirect(url_for('dashboard'))
+        register_failure(key)
         flash('Usuario o contraseña incorrectos.', 'danger')
     return render_template('login.html')
 
@@ -501,7 +540,7 @@ def download_csv(kind):
     output.write('\ufeff')
     writer = csv.writer(output, delimiter=';')
     writer.writerow([x[0] for x in cur.description])
-    writer.writerows(cur.fetchall())
+    writer.writerows([[safe_cell(v) for v in row] for row in cur.fetchall()])
     return Response(output.getvalue(), mimetype='text/csv; charset=utf-8',
                     headers={'Content-Disposition': f'attachment; filename={filename}_{date.today().isoformat()}.csv'})
 
@@ -597,10 +636,13 @@ def reset_password(user_id):
     try:
         password = request.form.get('password', '')
         if len(password) < 10: raise ValueError('La contraseña debe tener al menos 10 caracteres.')
+        new_hash = generate_password_hash(password)
         with db:
-            db.execute('UPDATE users SET password_hash=? WHERE id=?', (generate_password_hash(password), user_id))
+            db.execute('UPDATE users SET password_hash=? WHERE id=?', (new_hash, user_id))
             log('Contraseña restablecida', user['username'])
-        flash('Contraseña actualizada.', 'success')
+        if user_id == session['user_id']:
+            session['pwh'] = fingerprint(new_hash)  # mantiene la sesión propia tras cambiar su clave
+        flash('Contraseña actualizada. Las sesiones abiertas de esa cuenta se cerrarán.', 'success')
     except ValueError as ex:
         flash(str(ex), 'danger')
     return redirect(url_for('users'))

@@ -78,3 +78,26 @@ dialog.modal::backdrop{background:rgba(15,23,42,.45)}
 .sidebar{padding:20px 12px}.sidebar .brand{padding:0 8px 16px}.sidebar .brand-logo{max-width:140px}
 .sidebar nav{gap:2px}.sidebar nav a{padding:8px 12px;line-height:1.3;border-radius:8px;font-size:13px}
 .sidebar nav a span[data-icon]{margin-right:10px}
+body:has(.auth-card){min-height:100vh;background:radial-gradient(circle at 75% 25%,#2A6B74 0,transparent 45%),linear-gradient(135deg,#0B2F38 0%,#0F3D4C 50%,#123F45 100%)}
+body:has(.auth-card)::before{content:"";position:fixed;inset:0;background:repeating-linear-gradient(90deg,transparent 0 58px,rgba(255,255,255,.035) 58px 60px);pointer-events:none}
+.auth-main{max-width:none;margin:0;padding:24px 16px;min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative}
+.auth-card{width:100%;max-width:400px;margin:0;background:#fff;border:0;border-radius:22px;padding:34px 36px 30px;box-shadow:0 30px 60px rgba(0,0,0,.35);text-align:center}
+.login-logo{display:block;width:210px;max-width:80%;margin:0 auto 18px}
+.auth-title{margin:0;font-size:26px;font-weight:800;color:#0F3D4C;letter-spacing:.2px}
+.auth-sub{margin:4px 0 0;color:#64748B;font-size:13px}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:20px 0 12px;color:#0F3D4C}
+.auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:#CBD5E1}
+.auth-divider svg{width:26px;height:26px}
+.auth-welcome{margin:0;font-size:20px;font-weight:700;color:#0F3D4C}
+.auth-hint{margin:4px 0 0;font-size:12.5px;color:#64748B}
+.auth-form{display:grid;gap:14px;margin-top:22px;text-align:left}
+.auth-form label{display:grid;gap:6px;font-weight:600;color:#1E293B;font-size:12.5px}
+.input-wrap{display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;border:1px solid #CBD5E1;border-radius:12px;background:#fff}
+.input-wrap:focus-within{border-color:#0F3D4C;box-shadow:0 0 0 3px rgba(15,61,76,.12)}
+.input-wrap>svg{width:18px;height:18px;color:#64748B;flex:none}
+.input-wrap input{flex:1;height:100%;min-width:0;border:0;padding:0;font-size:13.5px;outline:0;background:transparent}
+.input-wrap .eye{display:grid;border:0;background:none;padding:0;cursor:pointer;color:#64748B}
+.input-wrap .eye svg{width:18px;height:18px}
+.login-btn{display:flex;align-items:center;justify-content:center;gap:10px;height:48px;margin-top:6px;border:0;border-radius:12px;background:#0F3D4C;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.login-btn:hover{background:#0B2F38}
+.login-btn svg{width:18px;height:18px}

@@ -11,6 +11,9 @@ import qrcode
 import qrcode.image.svg
 from flask import (Flask, abort, flash, g, redirect, render_template, request,
                    Response, session, url_for)
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils import get_column_letter
 from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE = Path(__file__).resolve().parent
@@ -594,6 +597,37 @@ def reset_password(user_id):
     except ValueError as ex:
         flash(str(ex), 'danger')
     return redirect(url_for('users'))
+
+
+@app.route('/reportes/<kind>.xlsx')
+def download_xlsx(kind):
+    if kind not in EXPORTS: abort(404)
+    query, filename = EXPORTS[kind]
+    cur = connection().execute(query)
+    headers = [x[0] for x in cur.description]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = filename
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill('solid', fgColor='C61827')
+    for row in cur.fetchall():
+        ws.append(list(row))
+        for cell in ws[ws.max_row]:
+            # Texto que empiece por = + - @ se guarda como texto, no como fórmula.
+            if isinstance(cell.value, str) and cell.value[:1] in '=+-@':
+                cell.data_type = 's'
+    ws.freeze_panes = 'A2'
+    ws.auto_filter.ref = ws.dimensions
+    for idx, title in enumerate(headers, 1):
+        longest = max([len(str(title))] + [len(str(ws.cell(r, idx).value or '')) for r in range(2, min(ws.max_row, 300) + 1)])
+        ws.column_dimensions[get_column_letter(idx)].width = min(max(longest + 2, 10), 50)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return Response(buf.getvalue(),
+                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    headers={'Content-Disposition': f'attachment; filename={filename}_{date.today().isoformat()}.xlsx'})
 
 
 @app.route('/actividad')

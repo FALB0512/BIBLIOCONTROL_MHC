@@ -13,3 +13,12 @@
 .button.small{border-radius:7px}
 .search-box{display:flex;align-items:center;gap:8px;border:1px solid #E0E0E0;background:#fff;border-radius:8px;padding:0 12px;min-width:240px}.search-box input{border:0;padding:10px 0;outline:0}.search-box input:focus{outline:0}
 .panel-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}.panel-title h2{margin:0;display:flex;align-items:center;gap:10px}
+.sidebar{overflow-y:auto}.sidebar .brand-logo{max-width:150px}.sidebar nav a{padding:11px 13px}.brand{letter-spacing:0}.eyebrow{letter-spacing:.6px}
+.button{background:#fff;border:1.5px solid #CBD5E1;border-radius:10px;color:#334155;font-weight:600;transition:all .15s ease}
+.button:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,23,42,.08)}
+.button.primary{color:#2563EB;border-color:#2563EB}.button.primary:hover{background:#2563EB;color:#fff}
+.button.success{color:#16A34A;border-color:#16A34A}.button.success:hover{background:#16A34A;color:#fff}
+.button.info{color:#0891B2;border-color:#0891B2}.button.info:hover{background:#0891B2;color:#fff}
+.button.warning{color:#D97706;border-color:#D97706}.button.warning:hover{background:#D97706;color:#fff}
+.button.danger{color:#DC2626;border-color:#DC2626;background:#fff}.button.danger:hover{background:#DC2626;color:#fff}
+.button.secondary{color:#475569;border-color:#94A3B8;background:#fff}.button.secondary:hover{background:#475569;color:#fff}

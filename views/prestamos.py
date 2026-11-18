@@ -3,7 +3,8 @@ import sqlite3
 from flask import flash, redirect, render_template, request, url_for
 
 from core import app
-from db import connection, log
+from db import connection
+from services.prestamos import registrar_devolucion, registrar_prestamo
 from validators import as_int, dateval, val
 
 
@@ -15,13 +16,7 @@ def loans():
             book_id = as_int('book_id')
             borrower = val('borrower', 150, True)
             department, loan_date, due_date, notes = val('department', 100), dateval('loan_date'), dateval('due_date'), val('notes', 500)
-            if due_date < loan_date: raise ValueError('La fecha límite debe ser igual o posterior a la fecha del préstamo.')
-            with db:
-                changed = db.execute("UPDATE books SET status='Prestado' WHERE id=? AND status='Disponible'", (book_id,))
-                if not changed.rowcount: raise ValueError('El ejemplar no está disponible para préstamo.')
-                db.execute('''INSERT INTO loans(book_id,borrower,department,loan_date,due_date,notes)
-                              VALUES (?,?,?,?,?,?)''', (book_id, borrower, department, loan_date, due_date, notes))
-                log('Préstamo', f'Ejemplar ID {book_id} entregado a {borrower}')
+            registrar_prestamo(db, book_id, borrower, department, loan_date, due_date, notes)
             flash('Préstamo registrado.', 'success')
         except (ValueError, sqlite3.IntegrityError) as ex:
             flash(str(ex), 'danger')
@@ -35,16 +30,8 @@ def loans():
 
 @app.post('/prestamos/<int:loan_id>/devolver')
 def return_book(loan_id):
-    db = connection()
     try:
-        returned = dateval('return_date')
-        with db:
-            loan = db.execute('SELECT * FROM loans WHERE id=? AND return_date IS NULL', (loan_id,)).fetchone()
-            if not loan: raise ValueError('El préstamo ya fue devuelto o no existe.')
-            if returned < loan['loan_date']: raise ValueError('La devolución no puede ser anterior al préstamo.')
-            db.execute('UPDATE loans SET return_date=? WHERE id=?', (returned, loan_id))
-            db.execute("UPDATE books SET status='Disponible' WHERE id=?", (loan['book_id'],))
-            log('Devolución', f'Préstamo ID {loan_id} · ejemplar ID {loan["book_id"]}')
+        registrar_devolucion(connection(), loan_id, dateval('return_date'))
         flash('Devolución registrada.', 'success')
     except ValueError as ex:
         flash(str(ex), 'danger')

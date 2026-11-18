@@ -5,9 +5,9 @@ import qrcode.image.svg
 from flask import abort, flash, redirect, render_template, request, url_for
 
 from core import app
-from db import connection, log
+from db import connection
+from services.inventario import cambiar_estado_ejemplar, editar_ejemplar, registrar_ejemplar
 from validators import as_int, val
-from views.areas import next_identifier
 
 
 @app.route('/libros', methods=['GET', 'POST'])
@@ -16,19 +16,11 @@ def books():
     if request.method == 'POST':
         try:
             room_id = as_int('room_id')
-            if not db.execute('SELECT 1 FROM rooms WHERE id=? AND active=1', (room_id,)).fetchone():
-                raise ValueError('La sala seleccionada no existe.')
             area_id, doc_type = as_int('area_id'), val('doc_type', 5, True)
             fields = [val('title', 200, True), val('author', 150),
                       val('category', 80), val('isbn', 30), val('publisher', 100)]
             condition, notes = val('condition', 20), val('notes', 500)
-            if condition not in ('Bueno','Regular','Deteriorado'): raise ValueError('Estado físico inválido.')
-            with db:
-                code, seq = next_identifier(db, area_id, doc_type)
-                db.execute('''INSERT INTO books(code,title,author,category,isbn,publisher,room_id,condition,notes,
-                              area_id,doc_type,seq) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
-                           (code, *fields, room_id, condition, notes, area_id, doc_type, seq))
-                log('Libro registrado', f'{code} · {fields[0]}')
+            code = registrar_ejemplar(db, room_id, area_id, doc_type, fields, condition, notes)
             flash(f'Ejemplar registrado con código {code}.', 'success')
         except (ValueError, sqlite3.IntegrityError) as ex:
             flash('No se pudo generar el código, intenta de nuevo.' if isinstance(ex, sqlite3.IntegrityError) else str(ex), 'danger')
@@ -61,24 +53,16 @@ def book_qr(book_id):
 
 @app.post('/libros/<int:book_id>/editar')
 def edit_book(book_id):
-    db = connection()
     try:
         fields = (val('title', 200, True), val('author', 150), val('category', 80),
                   val('isbn', 30), val('publisher', 100), val('condition', 20), val('notes', 500))
-        if fields[5] not in ('Bueno','Regular','Deteriorado'): raise ValueError('Estado físico inválido.')
-        with db:
-            book = db.execute('SELECT * FROM books WHERE id=?', (book_id,)).fetchone()
-            if not book: abort(404)
-            extra_sql, extra_args, new_code = '', [], None
-            if book['area_id'] is None:  # libro anterior al identificador de proceso: se le asigna uno nuevo
-                if not request.form.get('area_id'): raise ValueError('Selecciona área y tipo para asignar el nuevo código.')
-                area_id, doc_type = as_int('area_id'), val('doc_type', 5, True)
-                new_code, seq = next_identifier(db, area_id, doc_type)
-                extra_sql, extra_args = ', code=?, area_id=?, doc_type=?, seq=?', [new_code, area_id, doc_type, seq]
-            db.execute(f'''UPDATE books SET title=?,author=?,category=?,isbn=?,publisher=?,condition=?,notes=?{extra_sql}
-                           WHERE id=?''', (*fields, *extra_args, book_id))
-            log('Libro editado', f"{new_code or book['code']}: {fields[0]}")
+        area_id = doc_type = None
+        if request.form.get('area_id'):  # solo llega si el libro aún no tiene identificador de proceso
+            area_id, doc_type = as_int('area_id'), val('doc_type', 5, True)
+        new_code = editar_ejemplar(connection(), book_id, fields, area_id, doc_type)
         flash(f'Datos actualizados. Nuevo código: {new_code}.' if new_code else 'Datos bibliográficos actualizados.', 'success')
+    except LookupError:
+        abort(404)
     except (ValueError, sqlite3.IntegrityError) as ex:
         flash('No se pudo generar el código, intenta de nuevo.' if isinstance(ex, sqlite3.IntegrityError) else str(ex), 'danger')
     return redirect(url_for('books'))
@@ -86,16 +70,11 @@ def edit_book(book_id):
 
 @app.post('/libros/<int:book_id>/baja')
 def disable_book(book_id):
-    db = connection()
     try:
-        with db:
-            book = db.execute('SELECT * FROM books WHERE id=?', (book_id,)).fetchone()
-            if not book: abort(404)
-            if book['status'] == 'Prestado': raise ValueError('No se puede dar de baja un ejemplar prestado.')
-            next_status = 'Disponible' if book['status'] == 'Baja' else 'Baja'
-            db.execute('UPDATE books SET status=? WHERE id=?', (next_status, book_id))
-            log('Cambio de estado', f"{book['code']}: {next_status}")
+        cambiar_estado_ejemplar(connection(), book_id)
         flash('Estado actualizado.', 'success')
+    except LookupError:
+        abort(404)
     except ValueError as ex:
         flash(str(ex), 'danger')
     return redirect(url_for('books'))

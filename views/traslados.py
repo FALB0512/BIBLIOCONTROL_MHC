@@ -1,28 +1,19 @@
 from flask import flash, redirect, render_template, request, url_for
 
 from core import app
-from db import connection, log
+from db import connection
+from services.traslados import trasladar_ejemplar
 from validators import as_int, val
 
 
-@app.route('/traslados', methods=['GET','POST'])
+@app.route('/traslados', methods=['GET', 'POST'])
 def transfers():
     db = connection()
     if request.method == 'POST':
         try:
             book_id, to_room = as_int('book_id'), as_int('to_room_id')
             person, notes = val('person', 150, True), val('notes', 500)
-            with db:
-                book = db.execute('SELECT * FROM books WHERE id=?', (book_id,)).fetchone()
-                if not book or book['status'] != 'Disponible':
-                    raise ValueError('Solo se pueden trasladar ejemplares disponibles.')
-                if to_room == book['room_id']: raise ValueError('Selecciona una sala de destino diferente.')
-                if not db.execute('SELECT 1 FROM rooms WHERE id=? AND active=1', (to_room,)).fetchone():
-                    raise ValueError('La sala de destino no existe.')
-                db.execute('''INSERT INTO transfers(book_id,from_room_id,to_room_id,person,notes)
-                              VALUES (?,?,?,?,?)''', (book_id, book['room_id'], to_room, person, notes))
-                db.execute('UPDATE books SET room_id=? WHERE id=?', (to_room, book_id))
-                log('Traslado', f"{book['code']}: sala {book['room_id']} → {to_room}")
+            trasladar_ejemplar(db, book_id, to_room, person, notes)
             flash('Traslado registrado.', 'success')
         except ValueError as ex:
             flash(str(ex), 'danger')

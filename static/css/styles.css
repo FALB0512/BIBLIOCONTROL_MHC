@@ -27,3 +27,16 @@ button,input,select,textarea,.button{font-family:Inter,Arial,Helvetica,sans-seri
 .button.danger{background:#FEF2F2}.button.danger:hover{background:#DC2626}
 details{display:inline-block}details summary{list-style:none;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1.5px solid #0891B2;border-radius:10px;color:#0891B2;font-size:12px;font-weight:600;cursor:pointer;background:#fff}details summary::-webkit-details-marker{display:none}details summary:hover{background:#0891B2;color:#fff}details[open] summary{background:#ECFEFF}
 a.button{text-decoration:none}a.button:hover{text-decoration:none}
+body{background:#F3F6FB}
+.sidebar{background:linear-gradient(180deg,#0A1A33 0%,#0D2A52 100%);color:#D6E2F5}
+.sidebar nav a{color:#B9C9E0}.sidebar nav a:hover,.sidebar nav a.selected{background:#2563EB;color:#fff}
+.sidebar .brand{padding-bottom:26px}.sidebar .brand span{color:#fff}
+.appbar{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+.crumbs{font-size:13px;color:#64748B;margin-right:auto}.crumbs b{color:#0F172A}
+.global-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:0 14px;min-width:300px;flex:0 1 340px}.global-search input{border:0;padding:10px 0;outline:0;background:transparent;width:100%}
+.date-pill,.bell{background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:9px 13px;font-size:12px;color:#475569}
+.user-box{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #E2E8F0;border-radius:14px;padding:6px 8px 6px 6px}
+.avatar{width:36px;height:36px;border-radius:50%;background:#2563EB;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+.who{display:grid;line-height:1.25}.who b{font-size:13px;color:#0F172A}.who small{color:#64748B;font-size:11px}
+.user-box form{margin:0 0 0 4px}.user-box .exit{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;border-radius:9px;padding:7px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.metrics .metric:nth-child(1){background:#EFF6FF;border-left-color:#2563EB}.metrics .metric:nth-child(2){background:#ECFDF5;border-left-color:#16A34A}.metrics .metric:nth-child(3){background:#F5F3FF;border-left-color:#7C3AED}.metrics .metric:nth-child(4){background:#FFFBEB;border-left-color:#D97706}.metrics .metric:nth-child(5){background:#FEF2F2;border-left-color:#DC2626}

@@ -45,7 +45,7 @@ document.querySelectorAll('form').forEach(f=>{
     if(f.dataset.confirm){e.preventDefault();askConfirm(f.dataset.confirm,()=>{f.dataset.ok='1';f.requestSubmit()})}
   });
 });
-const SIZE=10;
+const SIZE=5;
 const tables=[...document.querySelectorAll('.table-wrap')].map(w=>{const f=document.createElement('div');f.className='tbl-foot';w.after(f);return {w,f,page:0}});
 function renderTable(t){
   const rows=[...t.w.querySelectorAll('tbody tr')];

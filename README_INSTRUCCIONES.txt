@@ -24,13 +24,15 @@ python app.py
 MÓDULOS OPERATIVOS
 - Acceso con contraseña cifrada mediante hash, configuración inicial.
 - Panel con indicadores generales y préstamos vencidos.
-- Salas de reunión: crear y actualizar.
+- Salas de reunión: crear, actualizar y activar/desactivar (solo si no tienen ejemplares).
 - Inventario: registrar, consultar, editar, dar de baja o reactivar.
 - Préstamos: registrar y devolver; no permite doble préstamo.
 - Traslados: registra origen, destino y responsable; bloquea ejemplares no disponibles.
 - Auditorías: verificación por sala con resultados encontrados, faltantes y novedades.
-- Reportes CSV compatibles con Excel: inventario, préstamos, traslados y auditorías.
+- Reportes en XLSX y PDF, y CSV compatibles con Excel: inventario, préstamos, traslados y auditorías.
 - Historial básico de operaciones.
+- Usuarios con roles: Administrador (gestiona usuarios), Bibliotecario (opera) y Consulta (solo lectura).
+- Etiquetas QR por ejemplar, imprimibles desde el inventario.
 
 IMPORTANTE
 - La base de datos bibliocontrol.db se crea automáticamente junto a app.py.
@@ -41,14 +43,12 @@ IMPORTANTE
 - No publiques el servidor Flask directamente en Internet ni en la red corporativa.
 - Para uso empresarial multiusuario se requiere revisión de TI, despliegue con servidor
   WSGI, control de acceso, copias de seguridad programadas y evaluación de SQLite.
-- En esta versión inicial los usuarios comparten permisos de administración; no hay
-  perfiles diferenciados ni autogestión de otras cuentas.
-- Los reportes se exportan a CSV, no aún a PDF ni XLSX nativo.
+- Los permisos por rol se validan en el servidor; Consulta no puede modificar datos.
 - Los registros de auditoría NO alteran automáticamente el estado de los libros.
 - Se trabaja por EJEMPLAR, no por título: cada copia tiene código único.
 - Las fechas de vencimiento se comparan con la fecha local de la máquina.
 - Para incorporar documentos confidenciales o nombres reales, solicita autorización.
 
 SIGUIENTE VERSIÓN PROPUESTA
-Roles, historial de cambios detallado, QR, impresión de actas, PDF/XLSX,
-respaldo automatizado, exportaciones filtradas y despliegue controlado por TI.
+Historial de cambios detallado, impresión de actas, respaldo automatizado,
+exportaciones filtradas y despliegue controlado por TI.

@@ -147,6 +147,7 @@ def before():
 def context():
     return {'csrf_token': session.get('csrf', ''), 'current_user': session.get('username'),
             'current_role': ROLES.get(session.get('role'), ''), 'is_admin': session.get('role') == 'admin',
+            'can_write': session.get('role') in WRITE_ROLES,
             'today': date.today().isoformat()}
 
 
@@ -301,6 +302,26 @@ def edit_room(room_id):
             log('Sala editada', name)
         flash('Sala actualizada.', 'success')
     except (ValueError, sqlite3.IntegrityError) as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('rooms'))
+
+
+@app.post('/salas/<int:room_id>/estado')
+def toggle_room(room_id):
+    db = connection()
+    room = db.execute('SELECT * FROM rooms WHERE id=?', (room_id,)).fetchone()
+    if not room: abort(404)
+    try:
+        with db:
+            if room['active']:
+                count = db.execute('SELECT count(*) FROM books WHERE room_id=?', (room_id,)).fetchone()[0]
+                if count:
+                    raise ValueError(f'No se puede desactivar: la sala tiene {count} ejemplar(es). Traslada primero los ejemplares.')
+            new_state = 0 if room['active'] else 1
+            db.execute('UPDATE rooms SET active=? WHERE id=?', (new_state, room_id))
+            log('Estado de sala', f"{room['name']}: {'activa' if new_state else 'inactiva'}")
+        flash('Estado de la sala actualizado.', 'success')
+    except ValueError as ex:
         flash(str(ex), 'danger')
     return redirect(url_for('rooms'))
 

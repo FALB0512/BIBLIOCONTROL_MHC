@@ -23,6 +23,6 @@ WRITE_ROLES = {'admin', 'bibliotecario'}
 # Se identifican por el nombre de la función de la ruta.
 ADMIN_ONLY_POST = {
     'books', 'disable_book',                                  # alta de ejemplares y bajas
-    'rooms', 'edit_room', 'toggle_room', 'delete_room',       # salas
-    'areas', 'edit_area', 'toggle_area', 'delete_area', 'create_type',  # áreas y tipos de documento
+    'rooms', 'toggle_room', 'delete_room',                    # salas: crear, desactivar, eliminar
+    'areas', 'toggle_area', 'delete_area', 'create_type',     # áreas y tipos: crear, desactivar, eliminar
 }

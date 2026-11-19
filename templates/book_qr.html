@@ -1,16 +1,23 @@
 {% extends 'base.html' %}
 {% block heading %}Etiqueta QR{% endblock %}
-{% block subheading %}Imprime la etiqueta y pégala en el ejemplar. El código QR contiene el resumen del ejemplar: al escanearlo se muestran sus datos.{% endblock %}
+{% block subheading %}Imprime la hoja, recorta por las líneas punteadas y pega la etiqueta en el ejemplar. El QR contiene el resumen del ejemplar.{% endblock %}
 {% block content %}
 <div class="no-print"><a class="button small secondary" href="{{ url_for('books') }}">← Volver al inventario</a></div>
-<p class="etiqueta-medida">Tamaño de la etiqueta: 5 × 3 cm</p>
-<div class="etiqueta">
-  {{ svg|safe }}
-  <div class="txt">
-    <code>MHC {{ book.code }}</code>
-    <p>{{ book.title }}</p>
-    <p>{{ book.room }}</p>
+<form method="get" class="etiqueta-barra no-print">
+  <label>Copias (1 a 21)<input type="number" name="copias" min="1" max="21" value="{{ copias }}" onchange="this.form.submit()"></label>
+  <button class="button info" type="button" onclick="window.print()">Imprimir hoja</button>
+</form>
+<p class="etiqueta-medida no-print">Cada etiqueta mide 6 × 4 cm. Recorta por las líneas punteadas.</p>
+<div class="hoja">
+  {% for _ in range(copias) %}
+  <div class="etiqueta">
+    {{ svg|safe }}
+    <div class="txt">
+      <code>MHC {{ book.code }}</code>
+      <p>{{ book.title }}</p>
+      <p>{{ book.room }}</p>
+    </div>
   </div>
+  {% endfor %}
 </div>
-<div class="no-print" style="text-align:center"><button class="button info" onclick="window.print()">Imprimir etiqueta (5 × 3 cm)</button></div>
 {% endblock %}

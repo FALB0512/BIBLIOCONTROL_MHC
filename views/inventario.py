@@ -49,7 +49,8 @@ def book_qr(book_id):
     if not book: abort(404)
     svg = qrcode.make(construir_resumen(dict(book)), image_factory=qrcode.image.svg.SvgPathImage,
                       box_size=10, border=2).to_string(encoding='unicode')
-    return render_template('book_qr.html', book=book, svg=svg)
+    copias = min(max(request.args.get('copias', type=int) or 1, 1), 21)
+    return render_template('book_qr.html', book=book, svg=svg, copias=copias)
 
 
 @app.post('/libros/<int:book_id>/editar')

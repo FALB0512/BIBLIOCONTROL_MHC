@@ -1,0 +1,8 @@
+# Entorno y caché de Python
+.venv/
+__pycache__/
+*.pyc
+
+# Datos locales: no se suben (contienen usuarios, inventario y la clave de sesión)
+bibliocontrol.db
+.secret_key

@@ -97,6 +97,13 @@ def init_db():
             db.execute(f'ALTER TABLE books ADD COLUMN {column} {ddl}')
     db.execute('''CREATE UNIQUE INDEX IF NOT EXISTS book_identifier ON books(area_id, doc_type, seq)
                   WHERE area_id IS NOT NULL''')
+    # Bajas hechas antes del archivo de bajas: se registran con los datos disponibles.
+    db.execute('''INSERT INTO bajas(book_id,code,title,author,category,isbn,publisher,condition,notes,
+                  room_id,room_name,motivo,responsable)
+                  SELECT b.id,b.code,b.title,b.author,b.category,b.isbn,b.publisher,b.condition,b.notes,
+                         b.room_id,r.name,'Baja anterior al archivo de bajas (motivo no registrado)','No registrado'
+                  FROM books b JOIN rooms r ON r.id=b.room_id
+                  WHERE b.status='Baja' AND NOT EXISTS (SELECT 1 FROM bajas x WHERE x.book_id=b.id)''')
     db.commit()
 
 

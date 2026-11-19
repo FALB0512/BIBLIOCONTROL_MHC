@@ -22,6 +22,10 @@ EXPORTS = {
                        t.transferred_at fecha, t.notes observaciones FROM transfers t
                        JOIN books b ON b.id=t.book_id JOIN rooms a ON a.id=t.from_room_id
                        JOIN rooms z ON z.id=t.to_room_id ORDER BY t.id DESC''', 'traslados'),
+    'bajas': ('''SELECT b.code codigo, b.title titulo, b.author autor, b.isbn isbn, b.publisher editorial,
+                  b.category categoria, b.condition estado_fisico, b.room_name sala, b.motivo motivo_baja,
+                  b.fecha_baja fecha_baja, b.responsable responsable, b.reactivado_en fecha_reactivacion,
+                  b.notes observaciones FROM bajas b ORDER BY b.room_name, b.fecha_baja DESC, b.id DESC''', 'bajas'),
     'auditorias': ('''SELECT a.id auditoria, r.name sala, a.audited_at fecha, a.auditor auditor,
                         b.code codigo, b.title titulo, i.result resultado, i.note detalle
                         FROM audit_items i JOIN audits a ON a.id=i.audit_id

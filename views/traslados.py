@@ -1,4 +1,4 @@
-from flask import flash, redirect, render_template, request, url_for
+from flask import flash, jsonify, redirect, render_template, request, url_for
 
 from core import app
 from db import connection
@@ -22,6 +22,21 @@ def transfers():
                            FROM transfers t JOIN books b ON b.id=t.book_id
                            JOIN rooms a ON a.id=t.from_room_id JOIN rooms z ON z.id=t.to_room_id
                            ORDER BY t.id DESC''').fetchall()
-    available = db.execute("SELECT id,code,title,room_id FROM books WHERE status='Disponible' ORDER BY title").fetchall()
     rooms_list = db.execute('SELECT id,name FROM rooms WHERE active=1 ORDER BY name').fetchall()
-    return render_template('transfers.html', items=items, available=available, rooms=rooms_list)
+    return render_template('transfers.html', items=items, rooms=rooms_list)
+
+
+@app.get('/traslados/buscar')
+def buscar_disponibles():
+    """Ejemplares disponibles de una sala, filtrados por código, título o autor."""
+    sala = request.args.get('sala', '').strip()
+    q = request.args.get('q', '').strip()[:100]
+    if not sala.isdigit(): return jsonify([])
+    sql = '''SELECT b.id, b.code, b.title, b.author FROM books b
+             WHERE b.status='Disponible' AND b.room_id=?'''
+    args = [int(sala)]
+    if q:
+        sql += ' AND (b.code LIKE ? OR b.title LIKE ? OR b.author LIKE ?)'
+        args += [f'%{q}%'] * 3
+    sql += ' ORDER BY b.code LIMIT 30'
+    return jsonify([dict(r) for r in connection().execute(sql, args).fetchall()])

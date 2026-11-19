@@ -1,1 +1,37 @@
-{% extends 'base.html' %}{% block heading %}Traslados entre salas{% endblock %}{% block subheading %}Registro de cambios de ubicación con responsable y trazabilidad.{% endblock %}{% block content %}<section class="panel"><h2>Registrar traslado</h2><form method="post" class="form-grid cols-3"><input type="hidden" name="csrf" value="{{csrf_token}}"><label>Ejemplar disponible<select name="book_id" required><option value="">Seleccionar libro</option>{% for b in available %}<option value="{{b.id}}">{{b.code}} — {{b.title}}</option>{% endfor %}</select></label><label>Sala destino<select name="to_room_id" required><option value="">Seleccionar sala</option>{% for r in rooms %}<option value="{{r.id}}">{{r.name}}</option>{% endfor %}</select></label><label>Responsable del traslado<input name="person" required maxlength="150"></label><label>Motivo u observación<input name="notes" maxlength="500"></label><button class="button success">Registrar traslado</button></form><p class="hint">Un ejemplar prestado o dado de baja no puede trasladarse. El sistema registra automáticamente su sala de origen.</p></section><section class="panel"><div class="panel-title"><h2>↗ Historial de traslados</h2><div class="search-box">🔍<input type="search" data-search placeholder="Buscar traslado..."></div><a href="{{url_for('download_csv',kind='traslados')}}">Exportar CSV ↓</a></div><div class="table-wrap"><table><thead><tr><th>Ejemplar</th><th>Origen</th><th>Destino</th><th>Responsable</th><th>Fecha</th></tr></thead><tbody>{% for t in items %}<tr><td><b>{{t.code}}</b><small class="small-block">{{t.title}}</small></td><td>{{t.source}}</td><td>{{t.destination}}</td><td>{{t.person}}</td><td>{{t.transferred_at}}</td></tr>{% else %}<tr><td colspan="5" class="empty">Todavía no se registran traslados.</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+{% extends 'base.html' %}{% block heading %}Traslados entre salas{% endblock %}{% block subheading %}Registro de cambios de ubicación con responsable y trazabilidad.{% endblock %}{% block content %}<section class="panel"><h2>Registrar traslado</h2><form method="post" id="form-traslado" class="form-grid cols-3"><input type="hidden" name="csrf" value="{{csrf_token}}"><input type="hidden" name="book_id" id="book-id"><label>1. Sala de origen<select id="sala-origen" required><option value="">Seleccionar sala</option>{% for r in rooms %}<option value="{{r.id}}">{{r.name}}</option>{% endfor %}</select></label><label>2. Buscar ejemplar en esa sala<input type="search" id="buscar-libro" placeholder="Código, título o autor" disabled autocomplete="off"></label><label>Sala destino<select name="to_room_id" required><option value="">Seleccionar sala</option>{% for r in rooms %}<option value="{{r.id}}">{{r.name}}</option>{% endfor %}</select></label><div class="resultados" id="resultados"></div><p class="hint" id="seleccionado" style="grid-column:1/-1">Ningún ejemplar seleccionado.</p><label>Responsable del traslado<input name="person" required maxlength="150"></label><label>Motivo u observación<input name="notes" maxlength="500"></label><button class="button success form-end">Registrar traslado</button></form><p class="hint">Un ejemplar prestado o dado de baja no puede trasladarse. El sistema registra automáticamente su sala de origen.</p></section><section class="panel"><div class="panel-title"><h2>↗ Historial de traslados</h2><div class="search-box">🔍<input type="search" data-search placeholder="Buscar traslado..."></div><a href="{{url_for('download_csv',kind='traslados')}}">Exportar CSV ↓</a></div><div class="table-wrap"><table><thead><tr><th>Ejemplar</th><th>Origen</th><th>Destino</th><th>Responsable</th><th>Fecha</th></tr></thead><tbody>{% for t in items %}<tr><td><b>{{t.code}}</b><small class="small-block">{{t.title}}</small></td><td>{{t.source}}</td><td>{{t.destination}}</td><td>{{t.person}}</td><td>{{t.transferred_at}}</td></tr>{% else %}<tr><td colspan="5" class="empty">Todavía no se registran traslados.</td></tr>{% endfor %}</tbody></table></div></section><script>
+(function(){
+  const sala = document.getElementById('sala-origen'), buscar = document.getElementById('buscar-libro');
+  const resultados = document.getElementById('resultados'), bookId = document.getElementById('book-id');
+  const sel = document.getElementById('seleccionado'), form = document.getElementById('form-traslado');
+  let timer = null, pedido = 0;
+  function limpiarSeleccion(){ bookId.value = ''; sel.textContent = 'Ningún ejemplar seleccionado.'; }
+  function cargar(){
+    limpiarSeleccion(); resultados.innerHTML = '';
+    if (!sala.value) { buscar.disabled = true; buscar.value = ''; return; }
+    buscar.disabled = false;
+    const id = ++pedido;
+    fetch('{{ url_for("buscar_disponibles") }}?sala=' + encodeURIComponent(sala.value) + '&q=' + encodeURIComponent(buscar.value.trim()))
+      .then(r => r.json()).then(items => {
+        if (id !== pedido) return;
+        if (!items.length) { resultados.innerHTML = '<p class="empty">No hay ejemplares disponibles que coincidan en esta sala.</p>'; return; }
+        items.forEach(it => {
+          const b = document.createElement('button');
+          b.type = 'button'; b.className = 'resultado';
+          b.textContent = it.code + ' — ' + it.title + (it.author ? ' (' + it.author + ')' : '');
+          b.onclick = () => {
+            bookId.value = it.id; sel.textContent = 'Seleccionado: ' + it.code + ' — ' + it.title;
+            resultados.querySelectorAll('.resultado').forEach(x => x.classList.remove('activo'));
+            b.classList.add('activo');
+          };
+          resultados.appendChild(b);
+        });
+      });
+  }
+  sala.addEventListener('change', cargar);
+  buscar.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(cargar, 250); });
+  form.addEventListener('submit', e => {
+    if (!bookId.value) { e.preventDefault(); sel.textContent = 'Selecciona un ejemplar de la lista antes de registrar.'; }
+  });
+})();
+</script>
+{% endblock %}

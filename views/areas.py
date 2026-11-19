@@ -4,7 +4,7 @@ from flask import abort, flash, redirect, render_template, request, url_for
 
 from core import app
 from db import connection
-from services.areas import cambiar_estado_area, crear_area, crear_tipo
+from services.areas import cambiar_estado_area, crear_area, crear_tipo, editar_area, eliminar_area
 from validators import as_int, val
 
 
@@ -40,4 +40,28 @@ def create_type():
         flash('Tipo de documento registrado.', 'success')
     except (ValueError, sqlite3.IntegrityError) as ex:
         flash('Ese tipo de documento ya existe.' if isinstance(ex, sqlite3.IntegrityError) else str(ex), 'danger')
+    return redirect(url_for('areas'))
+
+
+@app.post('/areas/<int:area_id>/editar')
+def edit_area(area_id):
+    try:
+        editar_area(connection(), area_id, val('name', 100, True))
+        flash('Área actualizada.', 'success')
+    except LookupError:
+        abort(404)
+    except ValueError as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('areas'))
+
+
+@app.post('/areas/<int:area_id>/eliminar')
+def delete_area(area_id):
+    try:
+        eliminar_area(connection(), area_id)
+        flash('Área eliminada.', 'success')
+    except LookupError:
+        abort(404)
+    except ValueError as ex:
+        flash(str(ex), 'danger')
     return redirect(url_for('areas'))

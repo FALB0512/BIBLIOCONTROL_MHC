@@ -102,3 +102,6 @@ body:has(.auth-card){min-height:100vh;background:#F3F6FB}body:has(.auth-card) .f
 .login-btn svg{width:18px;height:18px}
 .tbl-foot+.button{display:block;width:max-content;margin:14px 0 0 auto}
 .panel>.button:first-child{display:inline-flex;margin-bottom:22px}
+
+.row-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.row-actions form{margin:0}

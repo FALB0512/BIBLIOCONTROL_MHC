@@ -53,3 +53,22 @@ def crear_tipo(db, code, name):
         db.execute('INSERT INTO doc_types(code,name) VALUES (?,?)', (code, name))
         log('Tipo de documento creado', f'{code} · {name}')
     return code
+
+
+def editar_area(db, area_id, name):
+    """Solo cambia el nombre: el código del área forma parte de los identificadores ya asignados."""
+    area = db.execute('SELECT * FROM areas WHERE id=?', (area_id,)).fetchone()
+    if not area: raise LookupError('Área no encontrada.')
+    with db:
+        db.execute('UPDATE areas SET name=? WHERE id=?', (name, area_id))
+        log('Área editada', f"{area['code']} · {name}")
+
+
+def eliminar_area(db, area_id):
+    area = db.execute('SELECT * FROM areas WHERE id=?', (area_id,)).fetchone()
+    if not area: raise LookupError('Área no encontrada.')
+    count = db.execute('SELECT COUNT(*) FROM books WHERE area_id=?', (area_id,)).fetchone()[0]
+    if count: raise ValueError(f'No se puede eliminar: el área tiene {count} ejemplar(es). Puedes desactivarla.')
+    with db:
+        db.execute('DELETE FROM areas WHERE id=?', (area_id,))
+        log('Área eliminada', f"{area['code']} · {area['name']}")

@@ -4,7 +4,7 @@ from flask import abort, flash, redirect, render_template, request, url_for
 
 from core import app
 from db import connection
-from services.salas import cambiar_estado_sala, crear_sala, editar_sala
+from services.salas import cambiar_estado_sala, crear_sala, editar_sala, eliminar_sala
 from validators import val
 
 
@@ -40,6 +40,18 @@ def toggle_room(room_id):
     try:
         cambiar_estado_sala(connection(), room_id)
         flash('Estado de la sala actualizado.', 'success')
+    except LookupError:
+        abort(404)
+    except ValueError as ex:
+        flash(str(ex), 'danger')
+    return redirect(url_for('rooms'))
+
+
+@app.post('/salas/<int:room_id>/eliminar')
+def delete_room(room_id):
+    try:
+        eliminar_sala(connection(), room_id)
+        flash('Sala eliminada.', 'success')
     except LookupError:
         abort(404)
     except ValueError as ex:

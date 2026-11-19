@@ -3,7 +3,7 @@ from datetime import date
 
 from flask import abort, flash, redirect, request, session, url_for
 
-from core import ROLES, WRITE_ROLES, app
+from core import ADMIN_ONLY_POST, ROLES, WRITE_ROLES, app
 from db import connection, init_db
 from security import fingerprint, safe_back
 
@@ -35,6 +35,10 @@ def before():
     if (request.method == 'POST' and session.get('user_id') and endpoint != 'logout'
             and session.get('role') not in WRITE_ROLES):
         flash('Tu rol de Consulta no permite modificar datos.', 'danger')
+        return redirect(safe_back())
+    if (request.method == 'POST' and session.get('user_id') and session.get('role') != 'admin'
+            and endpoint in ADMIN_ONLY_POST):
+        flash('Solo el Administrador puede realizar esta acción.', 'danger')
         return redirect(safe_back())
 
 

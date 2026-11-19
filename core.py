@@ -19,3 +19,10 @@ app.config.update(SECRET_KEY=os.environ.get('BIBLIO_SECRET_KEY', KEYFILE.read_te
 
 ROLES = {'admin': 'Administrador', 'bibliotecario': 'Bibliotecario', 'consulta': 'Consulta'}
 WRITE_ROLES = {'admin', 'bibliotecario'}
+# Acciones de escritura que solo puede hacer el Administrador (el Bibliotecario las tiene prohibidas).
+# Se identifican por el nombre de la función de la ruta.
+ADMIN_ONLY_POST = {
+    'books', 'disable_book',                                  # alta de ejemplares y bajas
+    'rooms', 'edit_room', 'toggle_room', 'delete_room',       # salas
+    'areas', 'edit_area', 'toggle_area', 'delete_area', 'create_type',  # áreas y tipos de documento
+}

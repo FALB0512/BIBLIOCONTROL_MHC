@@ -106,3 +106,4 @@ body:has(.auth-card){min-height:100vh;background:#F3F6FB}body:has(.auth-card) .f
 .row-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .row-actions form{margin:0}
 .resultados{grid-column:1/-1;display:grid;gap:6px;max-height:260px;overflow:auto}.resultado{text-align:left;padding:9px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;cursor:pointer;font:inherit;color:inherit}.resultado:hover{border-color:#94A3B8}.resultado.activo{border-color:#C61827;background:#FDF2F2}
+.modal-form label{display:grid;gap:6px;font-weight:600;font-size:12px;color:#334155}

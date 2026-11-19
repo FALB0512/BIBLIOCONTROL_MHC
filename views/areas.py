@@ -4,7 +4,7 @@ from flask import abort, flash, redirect, render_template, request, url_for
 
 from core import app
 from db import connection
-from services.areas import cambiar_estado_area, crear_area
+from services.areas import cambiar_estado_area, crear_area, crear_tipo
 from validators import as_int, val
 
 
@@ -30,4 +30,14 @@ def toggle_area(area_id):
     except LookupError:
         abort(404)
     flash('Estado del área actualizado.', 'success')
+    return redirect(url_for('areas'))
+
+
+@app.post('/tipos')
+def create_type():
+    try:
+        crear_tipo(connection(), val('code', 5, True), val('name', 100, True))
+        flash('Tipo de documento registrado.', 'success')
+    except (ValueError, sqlite3.IntegrityError) as ex:
+        flash('Ese tipo de documento ya existe.' if isinstance(ex, sqlite3.IntegrityError) else str(ex), 'danger')
     return redirect(url_for('areas'))

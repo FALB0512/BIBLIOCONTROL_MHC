@@ -13,6 +13,16 @@
 </section>
 
 <section class="panel">
+  <h2>Registrar tipo de documento</h2>
+  <form method="post" action="{{ url_for('create_type') }}" class="form-grid cols-3">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <label>Letra (1 a 5 letras)<input name="code" maxlength="5" pattern="[A-Za-z]{1,5}" required placeholder="Ej. TE"></label>
+    <label>Nombre<input name="name" maxlength="100" required placeholder="Ej. Tesis"></label>
+    <button class="button success form-end">Guardar tipo</button>
+  </form>
+</section>
+
+<section class="panel">
   <div class="panel-title"><h2>▣ Áreas registradas</h2><div class="search-box">🔍<input type="search" data-search placeholder="Buscar área..."></div></div>
   <div class="table-wrap">
     <table>

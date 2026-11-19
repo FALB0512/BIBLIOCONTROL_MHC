@@ -1,4 +1,6 @@
 """Reglas de áreas y del identificador de ejemplares (área, tipo y consecutivo)."""
+import re
+
 from db import log
 
 
@@ -39,3 +41,15 @@ def cambiar_estado_area(db, area_id):
         db.execute('UPDATE areas SET active=? WHERE id=?', (new_state, area_id))
         log('Estado de área', f"{area['code']}: {'activa' if new_state else 'inactiva'}")
     return new_state
+
+
+def crear_tipo(db, code, name):
+    """Crea un tipo de documento nuevo. Los existentes no se modifican ni se borran."""
+    code, name = (code or '').strip().upper(), (name or '').strip()
+    if not re.fullmatch(r'[A-Z]{1,5}', code):
+        raise ValueError('La letra del tipo debe tener de 1 a 5 letras, sin números ni espacios.')
+    if not name: raise ValueError('Escribe el nombre del tipo de documento.')
+    with db:
+        db.execute('INSERT INTO doc_types(code,name) VALUES (?,?)', (code, name))
+        log('Tipo de documento creado', f'{code} · {name}')
+    return code

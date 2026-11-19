@@ -3,11 +3,14 @@
 {% block subheading %}Imprime la etiqueta y pégala en el ejemplar. El código QR contiene el resumen del ejemplar: al escanearlo se muestran sus datos.{% endblock %}
 {% block content %}
 <div class="no-print"><a class="button small secondary" href="{{ url_for('books') }}">← Volver al inventario</a></div>
-<div class="qr-label">
+<p class="etiqueta-medida">Tamaño de la etiqueta: 5 × 3 cm</p>
+<div class="etiqueta">
   {{ svg|safe }}
-  <code>MHC {{ book.code }}</code>
-  <p>{{ book.title }}</p>
-  <p>{{ book.room }}</p>
+  <div class="txt">
+    <code>MHC {{ book.code }}</code>
+    <p>{{ book.title }}</p>
+    <p>{{ book.room }}</p>
+  </div>
 </div>
-<div class="no-print" style="text-align:center"><button class="button info" onclick="window.print()">Imprimir etiqueta</button></div>
+<div class="no-print" style="text-align:center"><button class="button info" onclick="window.print()">Imprimir etiqueta (5 × 3 cm)</button></div>
 {% endblock %}

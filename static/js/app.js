@@ -29,10 +29,10 @@ document.querySelectorAll('details').forEach(d=>{
   const sum=d.querySelector('summary');const form=d.querySelector('form');if(!sum||!form)return;
   const dlg=document.createElement('dialog');dlg.className='modal';
   const row=d.closest('tr');const subject=row&&row.querySelector('td')?row.querySelector('td').textContent.trim().split('\n')[0]:'';
-  dlg.innerHTML='<div class="modal-head"><div><h3>'+sum.textContent.trim()+'</h3><small>'+subject+'</small></div><button type="button" class="modal-x" aria-label="Cerrar">×</button></div>';
+  dlg.innerHTML='<div class="modal-head"><div><h3>'+(sum.getAttribute('title')||sum.textContent.trim())+'</h3><small>'+subject+'</small></div><button type="button" class="modal-x" aria-label="Cerrar">×</button></div>';
   form.classList.remove('inline-form');form.classList.add('modal-form');dlg.append(form);
   dlg.querySelector('.modal-x').onclick=()=>dlg.close();
-  const btn=document.createElement('button');btn.type='button';btn.className=sum.className;btn.innerHTML=sum.innerHTML;btn.onclick=()=>dlg.showModal();
+  const btn=document.createElement('button');btn.type='button';btn.className=sum.className;btn.innerHTML=sum.innerHTML;btn.title=sum.getAttribute('title')||'';btn.setAttribute('aria-label',sum.getAttribute('aria-label')||'');btn.onclick=()=>dlg.showModal();
   d.replaceWith(btn);document.body.append(dlg);
 });
 document.addEventListener('input',e=>e.target.classList&&e.target.classList.remove('field-error'));

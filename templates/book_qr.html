@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block heading %}Etiqueta QR{% endblock %}
-{% block subheading %}Imprime la etiqueta y pégala en el ejemplar. El código QR contiene el código del ejemplar.{% endblock %}
+{% block subheading %}Imprime la etiqueta y pégala en el ejemplar. El código QR contiene el resumen del ejemplar: al escanearlo se muestran sus datos.{% endblock %}
 {% block content %}
 <div class="no-print"><a class="button small secondary" href="{{ url_for('books') }}">← Volver al inventario</a></div>
 <div class="qr-label">

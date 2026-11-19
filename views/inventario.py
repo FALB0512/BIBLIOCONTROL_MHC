@@ -7,6 +7,7 @@ from flask import abort, flash, redirect, render_template, request, session, url
 from core import app
 from db import connection
 from services.inventario import dar_de_baja, editar_ejemplar, registrar_ejemplar
+from resumen import construir_resumen
 from validators import as_int, val
 
 
@@ -46,7 +47,7 @@ def book_qr(book_id):
     book = connection().execute('''SELECT b.*, r.name room FROM books b JOIN rooms r ON r.id=b.room_id
                                    WHERE b.id=?''', (book_id,)).fetchone()
     if not book: abort(404)
-    svg = qrcode.make(book['code'], image_factory=qrcode.image.svg.SvgPathImage,
+    svg = qrcode.make(construir_resumen(dict(book)), image_factory=qrcode.image.svg.SvgPathImage,
                       box_size=10, border=2).to_string(encoding='unicode')
     return render_template('book_qr.html', book=book, svg=svg)
 

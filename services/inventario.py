@@ -10,7 +10,7 @@ def registrar_ejemplar(db, room_id, area_id, doc_type, fields, condition, notes)
         raise ValueError('La sala seleccionada no existe.')
     if condition not in CONDICIONES: raise ValueError('Estado físico inválido.')
     with db:
-        code, seq = next_identifier(db, area_id, doc_type)
+        code, seq = next_identifier(db, area_id, doc_type, room_id)
         db.execute('''INSERT INTO books(code,title,author,category,isbn,publisher,room_id,condition,notes,
                       area_id,doc_type,seq) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
                    (code, *fields, room_id, condition, notes, area_id, doc_type, seq))
@@ -27,7 +27,7 @@ def editar_ejemplar(db, book_id, fields, area_id=None, doc_type=None):
         extra_sql, extra_args, new_code = '', [], None
         if book['area_id'] is None:  # libro anterior al identificador de proceso: se le asigna uno nuevo
             if area_id is None: raise ValueError('Selecciona área y tipo para asignar el nuevo código.')
-            new_code, seq = next_identifier(db, area_id, doc_type)
+            new_code, seq = next_identifier(db, area_id, doc_type, book['room_id'])
             extra_sql, extra_args = ', code=?, area_id=?, doc_type=?, seq=?', [new_code, area_id, doc_type, seq]
         db.execute(f'''UPDATE books SET title=?,author=?,category=?,isbn=?,publisher=?,condition=?,notes=?{extra_sql}
                        WHERE id=?''', (*fields, *extra_args, book_id))
@@ -50,6 +50,8 @@ def dar_de_baja(db, book_id, motivo, responsable):
                    (book_id, book['code'], book['title'], book['author'], book['category'], book['isbn'],
                     book['publisher'], book['condition'], book['notes'], book['room_id'], book['room_name'],
                     motivo.strip(), responsable))
-        db.execute("UPDATE books SET status='Baja' WHERE id=?", (book_id,))
+        # El código queda libre para reasignarse en la misma sala; el archivo conserva el original.
+        db.execute("UPDATE books SET status='Baja', code=? WHERE id=?",
+                   (f"{book['code']} (baja #{book_id})", book_id))
         log('Baja de ejemplar', f"{book['code']} · {motivo.strip()}")
     return book['code']

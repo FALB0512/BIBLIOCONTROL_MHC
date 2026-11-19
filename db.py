@@ -95,8 +95,11 @@ def init_db():
                         ('seq', 'INTEGER')]:
         if column not in existing:
             db.execute(f'ALTER TABLE books ADD COLUMN {column} {ddl}')
-    db.execute('''CREATE UNIQUE INDEX IF NOT EXISTS book_identifier ON books(area_id, doc_type, seq)
-                  WHERE area_id IS NOT NULL''')
+    db.execute('DROP INDEX IF EXISTS book_identifier')
+    db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS book_identifier_activo ON books(area_id, doc_type, seq)
+                  WHERE area_id IS NOT NULL AND status != 'Baja'""")
+    db.execute("""UPDATE books SET code = code || ' (baja #' || id || ')'
+                  WHERE status = 'Baja' AND code NOT LIKE '% (baja #%'""")
     # Bajas hechas antes del archivo de bajas: se registran con los datos disponibles.
     db.execute('''INSERT INTO bajas(book_id,code,title,author,category,isbn,publisher,condition,notes,
                   room_id,room_name,motivo,responsable)

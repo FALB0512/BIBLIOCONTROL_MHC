@@ -11,10 +11,16 @@ def identifier_parts(db, area_id, doc_type):
     return area['code']
 
 
-def next_identifier(db, area_id, doc_type):
+def next_identifier(db, area_id, doc_type, room_id):
+    """Número libre de la misma sala (liberado por una baja) o, si no hay, el siguiente general."""
     area_code = identifier_parts(db, area_id, doc_type)
-    seq = db.execute('SELECT COALESCE(MAX(seq),0)+1 FROM books WHERE area_id=? AND doc_type=?',
-                     (area_id, doc_type)).fetchone()[0]
+    libre = db.execute("""SELECT MIN(b.seq) FROM books b
+                          WHERE b.area_id=? AND b.doc_type=? AND b.room_id=? AND b.status='Baja'
+                          AND b.seq NOT IN (SELECT seq FROM books
+                                            WHERE area_id=? AND doc_type=? AND status!='Baja')""",
+                       (area_id, doc_type, room_id, area_id, doc_type)).fetchone()[0]
+    seq = libre or db.execute('SELECT COALESCE(MAX(seq),0)+1 FROM books WHERE area_id=? AND doc_type=?',
+                              (area_id, doc_type)).fetchone()[0]
     return f'{area_code} {doc_type}-{seq:03d}', seq
 
 

@@ -3,17 +3,14 @@
 {% block subheading %}Registro histórico de ejemplares dados de baja, agrupado por sala, con el motivo y los datos del libro.{% endblock %}
 {% block content %}
 <section class="panel">
-  <form class="filters" method="get">
-    <select name="sala">
-      <option value="">Todas las salas</option>
-      {% for r in rooms %}<option value="{{ r.id }}" {{ 'selected' if chosen == r.id|string else '' }}>{{ r.name }}</option>{% endfor %}
-    </select>
-    <button class="button secondary">Filtrar</button>
-  </form>
+  <div class="filters">
+    <input type="search" data-search data-scope="page" placeholder="Buscar código, título, autor o motivo">
+    <select data-filter-key="salaId" data-scope="page"><option value="">Todas las salas</option>{% for r in rooms %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select>
+  </div>
 </section>
-{% for sala_nombre, rows in groups.items() %}
-<section class="panel">
-  <h2>{{ sala_nombre }} <small>({{ rows|length }} {{ 'baja' if rows|length == 1 else 'bajas' }})</small></h2>
+{% for (sala_id, sala_nombre), rows in groups.items() %}
+<section class="panel" data-sala-id="{{ sala_id }}">
+<h2>{{ sala_nombre }} <small>({{ rows|length }} {{ 'baja' if rows|length == 1 else 'bajas' }})</small></h2>
   <div class="table-wrap">
     <table>
       <thead><tr><th>Código</th><th>Título</th><th>Autor</th><th>ISBN</th><th>Editorial</th><th>Categoría</th><th>Condición</th><th>Observaciones</th><th>Motivo de baja</th><th>Fecha de baja</th><th>Responsable</th><th>Estado</th></tr></thead>

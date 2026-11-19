@@ -54,7 +54,7 @@ const tables=[...document.querySelectorAll('.table-wrap')].map(w=>{const f=docum
 function renderTable(t){
   const rows=[...t.w.querySelectorAll('tbody tr')];
   const data=rows.filter(r=>!r.querySelector('td[colspan]'));
-  const matched=data.filter(r=>r.dataset.hide!=='1');
+  const matched=data.filter(r=>r.dataset.hide!=='1'&&r.dataset.hideSel!=='1');
   const pages=Math.max(1,Math.ceil(matched.length/SIZE));
   t.page=Math.min(t.page,pages-1);
   data.forEach(r=>{r.style.display='none'});
@@ -72,11 +72,27 @@ function renderTable(t){
     t.f.append(p);
   }
 }
+const alcance=el=>el.dataset.scope==='page'?document:el.closest('section');
+// Muestra cada sala (sección con data-sala-id) solo si conserva filas visibles; luego repagina las tablas.
+function aplicarFiltros(scope){
+  scope.querySelectorAll('section[data-sala-id]').forEach(sec=>{
+    const hay=[...sec.querySelectorAll('tbody tr')].some(r=>!r.querySelector('td[colspan]')&&r.dataset.hide!=='1'&&r.dataset.hideSel!=='1');
+    sec.style.display=(sec.dataset.hideSel!=='1'&&hay)?'':'none';
+  });
+  tables.filter(t=>scope.contains(t.w)).forEach(t=>{t.page=0;renderTable(t)});
+}
 document.querySelectorAll('input[data-search]').forEach(input=>input.addEventListener('input',()=>{
   const q=input.value.trim().toLowerCase();
-  const section=input.closest('section');
-  section.querySelectorAll('tbody tr').forEach(row=>{row.dataset.hide=row.textContent.toLowerCase().includes(q)?'':'1'});
-  tables.filter(t=>section.contains(t.w)).forEach(t=>{t.page=0;renderTable(t)});
+  const scope=alcance(input);
+  scope.querySelectorAll('tbody tr').forEach(row=>{row.dataset.hide=row.textContent.toLowerCase().includes(q)?'':'1'});
+  aplicarFiltros(scope);
+}));
+// Filtro dinámico por sala: marca filas y secciones (data-sala-id) que no coinciden.
+document.querySelectorAll('select[data-filter-key]').forEach(sel=>sel.addEventListener('change',()=>{
+  const v=sel.value;
+  const scope=alcance(sel);
+  scope.querySelectorAll('[data-sala-id]').forEach(el=>{el.dataset.hideSel=(!v||el.dataset.salaId===v)?'':'1'});
+  aplicarFiltros(scope);
 }));
 tables.forEach(renderTable);
 document.querySelectorAll('[data-toggle-pass]').forEach(b=>b.addEventListener('click',()=>{const i=b.parentElement.querySelector('input');i.type=i.type==='password'?'text':'password'}));

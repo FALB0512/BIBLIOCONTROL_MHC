@@ -7,14 +7,8 @@ from db import connection
 @app.route('/bajas')
 def bajas():
     db = connection()
-    sala = request.args.get('sala', '').strip()
-    sql, args = 'SELECT * FROM bajas', []
-    if sala.isdigit():
-        sql += ' WHERE room_id=?'
-        args.append(int(sala))
-    sql += ' ORDER BY room_name, fecha_baja DESC, id DESC'
     groups = {}
-    for row in db.execute(sql, args).fetchall():
-        groups.setdefault(row['room_name'], []).append(row)
-    return render_template('bajas.html', groups=groups, chosen=sala,
+    for row in db.execute('SELECT * FROM bajas ORDER BY room_name, fecha_baja DESC, id DESC').fetchall():
+        groups.setdefault((row['room_id'], row['room_name']), []).append(row)
+    return render_template('bajas.html', groups=groups,
                            rooms=db.execute('SELECT id,name FROM rooms ORDER BY name').fetchall())

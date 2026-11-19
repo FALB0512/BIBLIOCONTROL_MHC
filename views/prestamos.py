@@ -24,8 +24,8 @@ def loans():
     items = db.execute('''SELECT l.*, b.code, b.title, r.name room FROM loans l
                            JOIN books b ON b.id=l.book_id JOIN rooms r ON r.id=b.room_id
                            ORDER BY (l.return_date IS NULL) DESC, l.id DESC''').fetchall()
-    available = db.execute("SELECT id,code,title FROM books WHERE status='Disponible' ORDER BY title").fetchall()
-    return render_template('loans.html', items=items, available=available)
+    rooms_list = db.execute('SELECT id,name FROM rooms WHERE active=1 ORDER BY name').fetchall()
+    return render_template('loans.html', items=items, rooms=rooms_list)
 
 
 @app.post('/prestamos/<int:loan_id>/devolver')

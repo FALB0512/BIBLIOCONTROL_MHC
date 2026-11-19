@@ -115,3 +115,37 @@ document.querySelectorAll('.timeline').forEach(tl=>{
   };
   render();
 });
+// Selector de ejemplar por sala: primero la sala, luego búsqueda por código, título o autor.
+document.querySelectorAll('.book-picker').forEach(pk=>{
+  const sala=pk.querySelector('[data-sala-origen]'), buscar=pk.querySelector('[data-buscar]');
+  const res=pk.querySelector('[data-resultados]'), id=pk.querySelector('[data-book-id]'), sel=pk.querySelector('[data-seleccionado]');
+  let timer=null, pedido=0;
+  const limpia=()=>{id.value='';sel.textContent='Ningún ejemplar seleccionado.'};
+  const cargar=()=>{
+    limpia(); res.innerHTML='';
+    if(!sala.value){buscar.disabled=true;buscar.value='';return}
+    buscar.disabled=false;
+    const n=++pedido;
+    fetch(pk.dataset.url+'?sala='+encodeURIComponent(sala.value)+'&q='+encodeURIComponent(buscar.value.trim()))
+      .then(r=>r.json()).then(items=>{
+        if(n!==pedido) return;
+        if(!items.length){res.innerHTML='<p class="empty">No hay ejemplares disponibles que coincidan en esta sala.</p>';return}
+        items.forEach(it=>{
+          const b=document.createElement('button');
+          b.type='button';b.className='resultado';
+          b.textContent=it.code+' — '+it.title+(it.author?' ('+it.author+')':'');
+          b.onclick=()=>{
+            id.value=it.id;sel.textContent='Seleccionado: '+it.code+' — '+it.title;
+            res.querySelectorAll('.resultado').forEach(x=>x.classList.remove('activo'));b.classList.add('activo');
+          };
+          res.appendChild(b);
+        });
+      });
+  };
+  sala.addEventListener('change',cargar);
+  buscar.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(cargar,250)});
+  pk.closest('form').addEventListener('submit',e=>{
+    if(!id.value){e.preventDefault();sel.textContent='Selecciona un ejemplar de la lista antes de registrar.'}
+  });
+});
+

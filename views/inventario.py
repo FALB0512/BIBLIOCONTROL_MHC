@@ -6,7 +6,7 @@ from flask import abort, flash, redirect, render_template, request, session, url
 
 from core import app
 from db import connection
-from services.inventario import dar_de_baja, editar_ejemplar, reactivar_ejemplar, registrar_ejemplar
+from services.inventario import dar_de_baja, editar_ejemplar, registrar_ejemplar
 from validators import as_int, val
 
 
@@ -27,8 +27,8 @@ def books():
         return redirect(url_for('books'))
     q = request.args.get('q', '').strip()[:100]
     room = request.args.get('room', '').strip()
-    sql = '''SELECT b.*,r.name room FROM books b JOIN rooms r ON r.id=b.room_id WHERE 1=1'''
-    args = []
+    sql = '''SELECT b.*,r.name room FROM books b JOIN rooms r ON r.id=b.room_id WHERE b.status != ?'''
+    args = ['Baja']  # los ejemplares dados de baja no aparecen en el inventario
     if q:
         sql += ' AND (b.code LIKE ? OR b.title LIKE ? OR b.author LIKE ?)'
         args += [f'%{q}%'] * 3
@@ -70,16 +70,9 @@ def edit_book(book_id):
 
 @app.post('/libros/<int:book_id>/baja')
 def disable_book(book_id):
-    db = connection()
     try:
-        book = db.execute('SELECT status FROM books WHERE id=?', (book_id,)).fetchone()
-        if not book: abort(404)
-        if book['status'] == 'Baja':
-            reactivar_ejemplar(db, book_id)
-            flash('Ejemplar reactivado.', 'success')
-        else:
-            dar_de_baja(db, book_id, val('motivo', 300, True), session['username'])
-            flash('Ejemplar dado de baja y archivado.', 'success')
+        dar_de_baja(connection(), book_id, val('motivo', 300, True), session['username'])
+        flash('Ejemplar dado de baja. Queda archivado en el módulo Bajas.', 'success')
     except LookupError:
         abort(404)
     except ValueError as ex:

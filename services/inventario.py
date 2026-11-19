@@ -53,14 +53,3 @@ def dar_de_baja(db, book_id, motivo, responsable):
         db.execute("UPDATE books SET status='Baja' WHERE id=?", (book_id,))
         log('Baja de ejemplar', f"{book['code']} · {motivo.strip()}")
     return book['code']
-
-
-def reactivar_ejemplar(db, book_id):
-    with db:
-        book = db.execute('SELECT * FROM books WHERE id=?', (book_id,)).fetchone()
-        if not book: raise LookupError('Ejemplar no encontrado.')
-        if book['status'] != 'Baja': raise ValueError('El ejemplar no está dado de baja.')
-        db.execute("UPDATE books SET status='Disponible' WHERE id=?", (book_id,))
-        db.execute('UPDATE bajas SET reactivado_en=CURRENT_TIMESTAMP WHERE book_id=? AND reactivado_en IS NULL', (book_id,))
-        log('Reactivación de ejemplar', book['code'])
-    return book['code']

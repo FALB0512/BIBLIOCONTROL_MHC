@@ -2,11 +2,11 @@ import sqlite3
 
 import qrcode
 import qrcode.image.svg
-from flask import abort, flash, redirect, render_template, request, url_for
+from flask import abort, flash, redirect, render_template, request, session, url_for
 
 from core import app
 from db import connection
-from services.inventario import cambiar_estado_ejemplar, editar_ejemplar, registrar_ejemplar
+from services.inventario import dar_de_baja, editar_ejemplar, reactivar_ejemplar, registrar_ejemplar
 from validators import as_int, val
 
 
@@ -70,9 +70,16 @@ def edit_book(book_id):
 
 @app.post('/libros/<int:book_id>/baja')
 def disable_book(book_id):
+    db = connection()
     try:
-        cambiar_estado_ejemplar(connection(), book_id)
-        flash('Estado actualizado.', 'success')
+        book = db.execute('SELECT status FROM books WHERE id=?', (book_id,)).fetchone()
+        if not book: abort(404)
+        if book['status'] == 'Baja':
+            reactivar_ejemplar(db, book_id)
+            flash('Ejemplar reactivado.', 'success')
+        else:
+            dar_de_baja(db, book_id, val('motivo', 300, True), session['username'])
+            flash('Ejemplar dado de baja y archivado.', 'success')
     except LookupError:
         abort(404)
     except ValueError as ex:

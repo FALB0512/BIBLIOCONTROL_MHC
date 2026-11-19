@@ -35,13 +35,32 @@ def editar_ejemplar(db, book_id, fields, area_id=None, doc_type=None):
     return new_code
 
 
-def cambiar_estado_ejemplar(db, book_id):
-    """Alterna entre Disponible y Baja. Un ejemplar prestado no puede darse de baja."""
+def dar_de_baja(db, book_id, motivo, responsable):
+    """Da de baja el ejemplar y archiva una copia de sus datos junto con el motivo."""
+    if not (motivo or '').strip(): raise ValueError('Indica el motivo de la baja.')
+    with db:
+        book = db.execute('''SELECT b.*, r.name room_name FROM books b JOIN rooms r ON r.id=b.room_id
+                             WHERE b.id=?''', (book_id,)).fetchone()
+        if not book: raise LookupError('Ejemplar no encontrado.')
+        if book['status'] == 'Prestado': raise ValueError('No se puede dar de baja un ejemplar prestado.')
+        if book['status'] == 'Baja': raise ValueError('El ejemplar ya está dado de baja.')
+        db.execute('''INSERT INTO bajas(book_id,code,title,author,category,isbn,publisher,condition,notes,
+                      room_id,room_name,motivo,responsable)
+                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                   (book_id, book['code'], book['title'], book['author'], book['category'], book['isbn'],
+                    book['publisher'], book['condition'], book['notes'], book['room_id'], book['room_name'],
+                    motivo.strip(), responsable))
+        db.execute("UPDATE books SET status='Baja' WHERE id=?", (book_id,))
+        log('Baja de ejemplar', f"{book['code']} · {motivo.strip()}")
+    return book['code']
+
+
+def reactivar_ejemplar(db, book_id):
     with db:
         book = db.execute('SELECT * FROM books WHERE id=?', (book_id,)).fetchone()
         if not book: raise LookupError('Ejemplar no encontrado.')
-        if book['status'] == 'Prestado': raise ValueError('No se puede dar de baja un ejemplar prestado.')
-        next_status = 'Disponible' if book['status'] == 'Baja' else 'Baja'
-        db.execute('UPDATE books SET status=? WHERE id=?', (next_status, book_id))
-        log('Cambio de estado', f"{book['code']}: {next_status}")
-    return next_status
+        if book['status'] != 'Baja': raise ValueError('El ejemplar no está dado de baja.')
+        db.execute("UPDATE books SET status='Disponible' WHERE id=?", (book_id,))
+        db.execute('UPDATE bajas SET reactivado_en=CURRENT_TIMESTAMP WHERE book_id=? AND reactivado_en IS NULL', (book_id,))
+        log('Reactivación de ejemplar', book['code'])
+    return book['code']

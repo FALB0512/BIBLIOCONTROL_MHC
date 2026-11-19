@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block heading %}Bajas archivadas{% endblock %}
+{% block subheading %}Registro histórico de ejemplares dados de baja, agrupado por sala, con el motivo y los datos del libro.{% endblock %}
+{% block content %}
+<section class="panel">
+  <form class="filters" method="get">
+    <select name="sala">
+      <option value="">Todas las salas</option>
+      {% for r in rooms %}<option value="{{ r.id }}" {{ 'selected' if chosen == r.id|string else '' }}>{{ r.name }}</option>{% endfor %}
+    </select>
+    <button class="button secondary">Filtrar</button>
+  </form>
+</section>
+{% for sala_nombre, rows in groups.items() %}
+<section class="panel">
+  <h2>{{ sala_nombre }} <small>({{ rows|length }} {{ 'baja' if rows|length == 1 else 'bajas' }})</small></h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Código</th><th>Título</th><th>Autor</th><th>ISBN</th><th>Editorial</th><th>Categoría</th><th>Condición</th><th>Observaciones</th><th>Motivo de baja</th><th>Fecha de baja</th><th>Responsable</th><th>Estado</th></tr></thead>
+      <tbody>
+      {% for b in rows %}
+        <tr>
+          <td><b>{{ b.code }}</b></td>
+          <td>{{ b.title }}</td>
+          <td>{{ b.author or '—' }}</td>
+          <td>{{ b.isbn or '—' }}</td>
+          <td>{{ b.publisher or '—' }}</td>
+          <td>{{ b.category or '—' }}</td>
+          <td>{{ b.condition }}</td>
+          <td>{{ b.notes or '—' }}</td>
+          <td>{{ b.motivo }}</td>
+          <td>{{ b.fecha_baja[:16] }}</td>
+          <td>{{ b.responsable }}</td>
+          <td>{% if b.reactivado_en %}Reactivado el {{ b.reactivado_en[:10] }}{% else %}Dado de baja{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<section class="panel"><p class="empty">No hay bajas archivadas{{ ' en esta sala' if chosen else '' }}.</p></section>
+{% endfor %}
+{% endblock %}

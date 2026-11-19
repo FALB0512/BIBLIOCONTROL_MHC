@@ -72,6 +72,14 @@ def init_db():
     INSERT OR IGNORE INTO doc_types(code,name) VALUES
       ('L','Libro'),('N','Norma'),('DT','Documento técnico'),('DI','Diccionario'),
       ('M','Manual'),('RE','Revista'),('G','Guía'),('CA','Catálogo');
+    CREATE TABLE IF NOT EXISTS bajas (
+      id INTEGER PRIMARY KEY, book_id INTEGER REFERENCES books(id),
+      code TEXT NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT '', isbn TEXT NOT NULL DEFAULT '', publisher TEXT NOT NULL DEFAULT '',
+      condition TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
+      room_id INTEGER NOT NULL REFERENCES rooms(id), room_name TEXT NOT NULL,
+      motivo TEXT NOT NULL, responsable TEXT NOT NULL,
+      fecha_baja TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, reactivado_en TEXT);
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY, actor TEXT NOT NULL, action TEXT NOT NULL,
       detail TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);

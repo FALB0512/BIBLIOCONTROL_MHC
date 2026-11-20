@@ -5,7 +5,7 @@
 <section class="panel">
   <div class="filters">
     <input type="search" data-search data-scope="page" placeholder="Buscar código, título, autor o motivo">
-    <select data-filter-key="salaId" data-scope="page"><option value="">Todas las salas</option>{% for r in rooms %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select>
+    <select data-filter-attr="sala-id" data-scope="page"><option value="">Todas las salas</option>{% for r in rooms %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select>
   </div>
 </section>
 {% for (sala_id, sala_nombre), rows in groups.items() %}

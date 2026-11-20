@@ -23,9 +23,9 @@ def loans():
         return redirect(url_for('loans'))
     items = db.execute('''SELECT l.*, b.code, b.title, r.name room FROM loans l
                            JOIN books b ON b.id=l.book_id JOIN rooms r ON r.id=b.room_id
-                           ORDER BY (l.return_date IS NULL) DESC, l.id DESC''').fetchall()
+                           ORDER BY (l.return_date IS NOT NULL), l.due_date, l.id DESC''').fetchall()
     rooms_list = db.execute('SELECT id,name FROM rooms WHERE active=1 ORDER BY name').fetchall()
-    return render_template('loans.html', items=items, rooms=rooms_list)
+    return render_template('loans.html', items=items, rooms=rooms_list, estado_sel=request.args.get('estado', ''))
 
 
 @app.post('/prestamos/<int:loan_id>/devolver')

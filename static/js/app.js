@@ -87,13 +87,17 @@ document.querySelectorAll('input[data-search]').forEach(input=>input.addEventLis
   scope.querySelectorAll('tbody tr').forEach(row=>{row.dataset.hide=row.textContent.toLowerCase().includes(q)?'':'1'});
   aplicarFiltros(scope);
 }));
-// Filtro dinámico por sala: marca filas y secciones (data-sala-id) que no coinciden.
-document.querySelectorAll('select[data-filter-key]').forEach(sel=>sel.addEventListener('change',()=>{
-  const v=sel.value;
-  const scope=alcance(sel);
-  scope.querySelectorAll('[data-sala-id]').forEach(el=>{el.dataset.hideSel=(!v||el.dataset.salaId===v)?'':'1'});
-  aplicarFiltros(scope);
-}));
+// Filtro dinámico (sala, estado, etc.): data-filter-attr="sala-id" compara con data-sala-id de filas y secciones.
+document.querySelectorAll('select[data-filter-attr]').forEach(sel=>{
+  const attr='data-'+sel.dataset.filterAttr;
+  const aplicar=()=>{
+    const v=sel.value, scope=alcance(sel);
+    scope.querySelectorAll('['+attr+']').forEach(el=>{el.dataset.hideSel=(!v||el.getAttribute(attr)===v)?'':'1'});
+    aplicarFiltros(scope);
+  };
+  sel.addEventListener('change',aplicar);
+  if(sel.value) aplicar();
+});
 tables.forEach(renderTable);
 document.querySelectorAll('[data-toggle-pass]').forEach(b=>b.addEventListener('click',()=>{const i=b.parentElement.querySelector('input');i.type=i.type==='password'?'text':'password'}));
 document.querySelectorAll('.timeline').forEach(tl=>{

@@ -28,7 +28,8 @@ def books():
         return redirect(url_for('books'))
     q = request.args.get('q', '').strip()[:100]
     room = request.args.get('room', '').strip()
-    sql = '''SELECT b.*,r.name room FROM books b JOIN rooms r ON r.id=b.room_id WHERE b.status != ?'''
+    sql = '''SELECT b.*,r.name room,l.borrower,l.due_date FROM books b JOIN rooms r ON r.id=b.room_id
+                  LEFT JOIN loans l ON l.book_id=b.id AND l.return_date IS NULL WHERE b.status != ?'''
     args = ['Baja']  # los ejemplares dados de baja no aparecen en el inventario
     if q:
         sql += ' AND (b.code LIKE ? OR b.title LIKE ? OR b.author LIKE ?)'

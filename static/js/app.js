@@ -28,7 +28,7 @@ const askConfirm=(msg,fn)=>{pendingOk=fn;confirmDlg.querySelector('.confirm-msg'
 document.querySelectorAll('details').forEach(d=>{
   const sum=d.querySelector('summary');const form=d.querySelector('form');if(!sum||!form)return;
   const dlg=document.createElement('dialog');dlg.className='modal';
-  const row=d.closest('tr');const subject=row&&row.querySelector('td')?row.querySelector('td').textContent.trim().split('\n')[0]:'';
+  const row=d.closest('tr');const firstTd=row&&row.querySelector('td');const subject=firstTd?((firstTd.querySelector('b')||firstTd).textContent.trim()):'';
   dlg.innerHTML='<div class="modal-head"><div><h3>'+(sum.getAttribute('title')||sum.textContent.trim())+'</h3><small>'+subject+'</small></div><button type="button" class="modal-x" aria-label="Cerrar">×</button></div>';
   form.classList.remove('inline-form');form.classList.add('modal-form');dlg.append(form);
   dlg.querySelector('.modal-x').onclick=()=>dlg.close();

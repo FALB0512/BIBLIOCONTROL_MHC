@@ -31,7 +31,8 @@ def loans():
 @app.post('/prestamos/<int:loan_id>/devolver')
 def return_book(loan_id):
     try:
-        registrar_devolucion(connection(), loan_id, dateval('return_date'))
+        registrar_devolucion(connection(), loan_id, dateval('return_date'),
+                             val('return_condition', 20, True), val('return_notes', 500))
         flash('Devolución registrada.', 'success')
     except ValueError as ex:
         flash(str(ex), 'danger')

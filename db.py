@@ -107,6 +107,10 @@ def init_db():
                          b.room_id,r.name,'Baja anterior al archivo de bajas (motivo no registrado)','No registrado'
                   FROM books b JOIN rooms r ON r.id=b.room_id
                   WHERE b.status='Baja' AND NOT EXISTS (SELECT 1 FROM bajas x WHERE x.book_id=b.id)''')
+    existing_loans = [c['name'] for c in db.execute('PRAGMA table_info(loans)')]
+    for column in ('return_condition', 'return_notes'):
+        if column not in existing_loans:
+            db.execute(f"ALTER TABLE loans ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
     db.commit()
 
 
